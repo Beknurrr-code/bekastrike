@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RAILSTRIKE 2.0 — FPS в стиле Counter-Strike</title>
+<title>BEKASTRIKE 2.0 — FPS в стиле Counter-Strike</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
   html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family:"Segoe UI",Arial,sans-serif; }
@@ -310,7 +310,7 @@
 <!-- Main menu -->
 <div class="overlay" id="mainmenu">
   <div class="menu">
-    <div class="title">RAILSTRIKE<span class="v2">2.0</span></div>
+    <div class="title">BEKASTRIKE<span class="v2">2.0</span></div>
     <div class="subtitle">FPS в стиле Counter-Strike</div>
     <button class="btn" id="play-btn">ИГРАТЬ</button>
     <button class="btn gray" id="mp-btn" style="margin-top:10px">🌐 МУЛЬТИПЛЕЕР</button>
@@ -346,7 +346,7 @@
 <!-- Lobby -->
 <div id="lobby">
   <div class="lb-wrap">
-    <div class="lb-title">RAILSTRIKE</div>
+    <div class="lb-title">BEKASTRIKE</div>
     <div class="lb-sub">Мультиплеер · P2P</div>
 
     <div class="lb-block">
@@ -383,7 +383,7 @@
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 /* ============================================================
-   RAILSTRIKE 2.0 — CS-style FPS
+   BEKASTRIKE 2.0 — CS-style FPS
    ============================================================ */
 'use strict';
 
@@ -396,9 +396,9 @@ const dist3 = (ax,ay,az,bx,by,bz) => Math.hypot(ax-bx, ay-by, az-bz);
 // ---------- settings ----------
 const settings = Object.assign(
 {sens:1, fov:75, vol:0.5, diff:'medium', shadows:true, invX:false, invY:false},
-JSON.parse(localStorage.getItem('railstrike_settings')||'{}')
+JSON.parse(localStorage.getItem('bekastrike_settings')||'{}')
 );
-function saveSettings(){ localStorage.setItem('railstrike_settings', JSON.stringify(settings)); }
+function saveSettings(){ localStorage.setItem('bekastrike_settings', JSON.stringify(settings)); }
 function applyFov(){
   camera.fov = awpZoom ? settings.fov*0.35 : settings.fov;
   camera.updateProjectionMatrix();
@@ -2149,7 +2149,7 @@ const net = {
   hostInput:new Map(),  // host: clientPeerId -> input snapshot
   sendTimer:0
 };
-const NET_PREFIX = 'railstrike-v1-';
+const NET_PREFIX = 'bekastrike-v1-';
 function netRoomId(code){ return NET_PREFIX + code.toUpperCase(); }
 function netCode(){
   const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -2348,7 +2348,7 @@ function lbUpdatePlayers(){
 }
 function openLobby(){
   $('lobby').classList.add('open');
-  $('lb-name').value = localStorage.getItem('railstrike_nick') || 'Боец';
+  $('lb-name').value = localStorage.getItem('bekastrike_nick') || 'Боец';
   lbUpdatePlayers();
   if(!net.peer){
     net.peer = new Peer();
@@ -2368,7 +2368,7 @@ function closeLobby(){
 function lbHost(){
   const name = ($('lb-name').value||'').trim() || 'Боец';
   player.name = name;
-  localStorage.setItem('railstrike_nick', name);
+  localStorage.setItem('bekastrike_nick', name);
   if(net.peer){ net.peer.destroy(); net.peer = null; }
   // retry codes until free
   let attempts = 0;
@@ -2398,7 +2398,7 @@ function lbJoin(){
   if(code.length < 4){ lbLog('Введи код комнаты (5 символов)', 'err'); return; }
   const name = ($('lb-name').value||'').trim() || 'Боец';
   player.name = name;
-  localStorage.setItem('railstrike_nick', name);
+  localStorage.setItem('bekastrike_nick', name);
   if(!net.peer){
     net.peer = new Peer();
     net.peer.on('error', ()=>{});
