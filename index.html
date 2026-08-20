@@ -1002,37 +1002,47 @@ function buildViewmodel(kind){
     const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.12,8), mat); scope.rotation.x = Math.PI/2; scope.position.set(0,0.09,-0.35); vmGun.add(scope);
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.14,0.07), mat); mag.position.set(0,-0.12,-0.3); vmGun.add(mag);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.1,0.07), mat); grip.position.set(0,-0.1,-0.05); vmGun.add(grip);
+    const muzzle = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.045,0.08,8), mat); muzzle.rotation.x = Math.PI/2; muzzle.position.set(0,0.01,-1.15); vmGun.add(muzzle);
+    const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.03,0.15), mat); cheek.position.set(0,0.07,-0.6); vmGun.add(cheek);
   } else if(kind==='scout'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.09,0.6), mat); body.position.set(0,0,-0.35); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.03,0.03,0.4), mat2); barrel.position.set(0,0.01,-0.7); vmGun.add(barrel);
     const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.1,8), mat); scope.rotation.x = Math.PI/2; scope.position.set(0,0.08,-0.3); vmGun.add(scope);
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.12,0.06), mat); mag.position.set(0,-0.11,-0.25); vmGun.add(mag);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.09,0.06), mat); grip.position.set(0,-0.09,-0.05); vmGun.add(grip);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.06,0.2), mat); stock.position.set(0,-0.01,0.2); vmGun.add(stock);
   } else if(kind==='m249'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.12,0.6), mat); body.position.set(0,0,-0.35); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.045,0.045,0.4), mat2); barrel.position.set(0,0.02,-0.7); vmGun.add(barrel);
     const box = new THREE.Mesh(new THREE.BoxGeometry(0.09,0.16,0.12), mat); box.position.set(0,-0.14,-0.2); vmGun.add(box);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1,0.08), mat); grip.position.set(0,-0.1,-0.05); vmGun.add(grip);
+    const carry = new THREE.Mesh(new THREE.BoxGeometry(0.03,0.06,0.1), mat); carry.position.set(0,0.1,-0.25); vmGun.add(carry);
+    const bipod = new THREE.Mesh(new THREE.BoxGeometry(0.02,0.1,0.02), mat); bipod.position.set(0,-0.12,-0.55); vmGun.add(bipod);
   } else if(kind==='p90'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.1,0.5), mat); body.position.set(0,0,-0.3); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.035,0.3), mat2); barrel.position.set(0,0.02,-0.55); vmGun.add(barrel);
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.2,0.08), mat); mag.position.set(0,-0.15,-0.2); vmGun.add(mag);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.1,0.07), mat); grip.position.set(0,-0.1,-0.05); vmGun.add(grip);
+    const sight = new THREE.Mesh(new THREE.BoxGeometry(0.02,0.04,0.05), mat); sight.position.set(0,0.07,-0.4); vmGun.add(sight);
   } else if(kind==='ump' || kind==='mp5'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.1,0.5), mat); body.position.set(0,0,-0.3); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.035,0.3), mat2); barrel.position.set(0,0.02,-0.55); vmGun.add(barrel);
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.08), mat); mag.position.set(0,-0.13,-0.2); vmGun.add(mag);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.1,0.07), mat); grip.position.set(0,-0.1,-0.05); vmGun.add(grip);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.2), mat); stock.position.set(0,0,0.2); vmGun.add(stock);
   } else if(kind==='m4' || kind==='sg552' || kind==='aug'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.1,0.55), mat); body.position.set(0,0,-0.32); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.35), mat2); barrel.position.set(0,0.02,-0.6); vmGun.add(barrel);
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.16,0.08), mat); mag.position.set(0,-0.13,-0.25); vmGun.add(mag);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1,0.08), mat); grip.position.set(0,-0.1,-0.1); vmGun.add(grip);
+    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.08,0.25), mat); stock.position.set(0,-0.01,0.2); vmGun.add(stock);
+    const front = new THREE.Mesh(new THREE.BoxGeometry(0.045,0.045,0.1), mat); front.position.set(0,0.02,-0.7); vmGun.add(front);
   } else if(kind==='glock' || kind==='fiveseven'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.09,0.35), mat); body.position.set(0,0,-0.2); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.03,0.03,0.2), mat2); barrel.position.set(0,0.01,-0.4); vmGun.add(barrel);
     const mag = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.12,0.06), mat); mag.position.set(0,-0.1,-0.15); vmGun.add(mag);
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.08,0.06), mat); grip.position.set(0,-0.08,-0.05); vmGun.add(grip);
+    const slide = new THREE.Mesh(new THREE.BoxGeometry(0.052,0.03,0.2), mat); slide.position.set(0,0.06,-0.15); vmGun.add(slide);
   } else {
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.12,0.5), mat); body.position.set(0,0,-0.3); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.35), mat2); barrel.position.set(0,0.02,-0.6); vmGun.add(barrel);
@@ -1699,7 +1709,12 @@ function playerShoot(){
   flashSprite.visible = true;
   setTimeout(()=>{ flashSprite.visible = false; }, heavy ? 80 : 50);
   vmKick = heavy ? 0.2 : 0.14;
-  spread = Math.min(spread + w.spread*3, 0.12);
+  // first-shot accuracy (CS-style): spread resets when not firing, grows with each shot
+  if(player._lastShotT === undefined || (performance.now() - player._lastShotT) > 600){
+    spread = 0; // first bullet is accurate
+  }
+  player._lastShotT = performance.now();
+  spread = Math.min(spread + w.spread*3, 0.14);
   player.pitch += w.kind==='ak' ? 0.006 : (w.kind==='awp'||w.kind==='scout') ? 0.01 : w.kind==='m249' ? 0.008 : 0.0025;
 
   // shell
@@ -2795,19 +2810,33 @@ function updatePlayer(dt){
   if(keys['KeyD']) strafe += 1;
   if(keys['KeyA']) strafe -= 1;
   const len = Math.hypot(fwd, strafe);
-  let speed = w.kind==='awp' ? 4.2 : 5.5;
-  if(walking) speed = 2.6;
-  if(crouching) speed = 2.8;
+  // weapon-based speed: heavy guns slow you down (like CS)
+  const spdMap = {knife:5.8, usp:5.5, glock:5.5, fiveseven:5.5, deagle:5.5, mp5:5.2, ump:5.2, p90:5.2, ak:5.0, m4:5.0, sg552:5.0, aug:5.0, scout:4.6, awp:4.2, m249:4.0, he:5.5, smoke:5.5, flash:5.5};
+  let speed = spdMap[player.cur] || 5.5;
+  if(walking) speed *= 0.55;
+  if(crouching) speed *= 0.6;
   if(len > 0){
     const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
     // FIXED: forward = -sin/-cos (camera looks along -Z rotated by yaw)
     const mx = -(fwd/len)*sin + (strafe/len)*cos;
     const mz = -(fwd/len)*cos - (strafe/len)*sin;
-    player.x += mx * speed * dt;
-    player.z += mz * speed * dt;
+    // smooth acceleration (inertia — no instant stop/start)
+    player.vx += (mx * speed - (player.vx||0)) * Math.min(1, dt*9);
+    player.vz += (mz * speed - (player.vz||0)) * Math.min(1, dt*9);
+    player.x += player.vx * dt;
+    player.z += player.vz * dt;
     player.moving = true;
-    player.speed = speed;
-  } else { player.moving = false; player.speed = 0; }
+    player.speed = Math.hypot(player.vx, player.vz);
+  } else {
+    // decelerate to a stop
+    player.vx = (player.vx||0) * Math.max(0, 1 - dt*10);
+    player.vz = (player.vz||0) * Math.max(0, 1 - dt*10);
+    if(Math.abs(player.vx) < 0.01 && Math.abs(player.vz) < 0.01){ player.vx = 0; player.vz = 0; }
+    player.x += player.vx * dt;
+    player.z += player.vz * dt;
+    player.moving = Math.abs(player.vx) + Math.abs(player.vz) > 0.01;
+    player.speed = Math.hypot(player.vx, player.vz);
+  }
   for(const b of colliders){
     const r = collideCircle(player.x, player.z, player.radius, b, player.y);
     player.x = r[0]; player.z = r[1];
@@ -3136,6 +3165,20 @@ function updateBot(b, dt){
   // crouch visual (torso=4, head=5)
   b.group.children[4].position.y = 1.0 - b.crouch*0.2;
   b.group.children[5].position.y = 1.5 - b.crouch*0.35;
+  // head looks at target (realistic)
+  const head = b.group.children[5];
+  const face = b.group.children[6];
+  if(b.target && !b.target.dead && b.mode === 'combat'){
+    const hAng = Math.atan2(b.target.x - b.x, b.target.z - b.z) - b.yaw;
+    let hd = hAng;
+    while(hd > Math.PI) hd -= Math.PI*2;
+    while(hd < -Math.PI) hd += Math.PI*2;
+    head.rotation.y = clamp(hd, -0.9, 0.9);
+    face.rotation.y = clamp(hd, -0.9, 0.9);
+  } else {
+    head.rotation.y = 0;
+    face.rotation.y = 0;
+  }
   const moving = Math.abs(moveX)+Math.abs(moveZ) > 0.01;
   if(moving){
     b.walkT = (b.walkT||0) + dt*9;
