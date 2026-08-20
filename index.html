@@ -72,7 +72,7 @@
   @keyframes lowpulse { 0%,100%{opacity:.25;} 50%{opacity:.6;} }
   #flashfx { position:absolute; inset:0; background:#fff; opacity:0; transition:opacity .4s; z-index:5; }
 
-  #hitmarker { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:26px; height:26px; opacity:0; }
+  #hitmarker { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:26px; height:26px; opacity:0; transition:opacity .1s, transform .1s; }
   #hitmarker .l { position:absolute; left:0; top:50%; width:10px; height:2px; background:#fff; transform:translateY(-1px); }
   #hitmarker .r { position:absolute; right:0; top:50%; width:10px; height:2px; background:#fff; transform:translateY(-1px); }
   #hitmarker .t { position:absolute; top:0; left:50%; width:2px; height:10px; background:#fff; transform:translateX(-1px); }
@@ -468,6 +468,15 @@ const AudioSys = {
     else if(kind==='usp'){ this.noise(0.05,0.3*vol,3000); this.tone(300,0.04,0.15*vol,'square',-100); }
     else if(kind==='deagle'){ this.noise(0.12,0.6*vol,1200); this.tone(110,0.12,0.4*vol,'sawtooth',-60); }
     else if(kind==='awp'){ this.noise(0.16,0.85*vol,900); this.tone(90,0.15,0.5*vol,'sawtooth',-40); this.noise(0.1,0.3*vol,700,'lowpass',0.12); }
+    else if(kind==='glock'){ this.noise(0.05,0.3*vol,2800); this.tone(320,0.04,0.15*vol,'square',-90); }
+    else if(kind==='fiveseven'){ this.noise(0.05,0.32*vol,2900); this.tone(310,0.04,0.16*vol,'square',-90); }
+    else if(kind==='ump'){ this.noise(0.08,0.45*vol,1600); this.tone(180,0.07,0.3*vol,'sawtooth',-70); }
+    else if(kind==='p90'){ this.noise(0.06,0.4*vol,2200); this.tone(200,0.05,0.25*vol,'square',-60); }
+    else if(kind==='m4'){ this.noise(0.08,0.45*vol,2000); this.tone(160,0.07,0.3*vol,'sawtooth',-70); }
+    else if(kind==='sg552'){ this.noise(0.08,0.48*vol,1900); this.tone(150,0.07,0.32*vol,'sawtooth',-70); }
+    else if(kind==='aug'){ this.noise(0.08,0.45*vol,2000); this.tone(160,0.07,0.3*vol,'sawtooth',-70); }
+    else if(kind==='scout'){ this.noise(0.13,0.7*vol,1100); this.tone(100,0.12,0.45*vol,'sawtooth',-50); }
+    else if(kind==='m249'){ this.noise(0.08,0.5*vol,1700); this.tone(150,0.07,0.35*vol,'sawtooth',-60); }
     else if(kind==='bot'){ this.noise(0.07,0.25*vol,2000); }
   },
   empty(){ this.tone(700,0.03,0.1,'square'); },
@@ -1206,7 +1215,7 @@ function spawnDamageNumber(x, y, z, amount, crit){
   sp.position.set(x, y, z);
   sp.scale.set(1.1, 0.55, 1);
   scene.add(sp);
-  dmgNums.push({sprite:sp, life:0.9, max:0.9, vy:1.6});
+  dmgNums.push({sprite:sp, life:0.9, max:0.9, vy:1.6, crit:!!crit});
 }
 function damageEntity(e, dmg, part, attacker, weaponName, weaponKind){
   if(e.dead) return;
@@ -1489,12 +1498,15 @@ function playerShoot(){
   player.ammo[player.cur].mag--;
   player.fireT = w.rate;
   AudioSys.shot(w.kind);
-  flashLight.intensity = 2.5;
+  // muzzle flash: bigger for heavy guns, colored per weapon
+  const heavy = w.kind==='awp'||w.kind==='scout'||w.kind==='m249'||w.kind==='deagle';
+  flashLight.intensity = heavy ? 4 : 2.5;
+  flashSprite.scale.set(heavy ? 0.8 : 0.5, heavy ? 0.8 : 0.5, 1);
   flashSprite.visible = true;
-  setTimeout(()=>{ flashSprite.visible = false; }, 50);
-  vmKick = 0.14;
+  setTimeout(()=>{ flashSprite.visible = false; }, heavy ? 80 : 50);
+  vmKick = heavy ? 0.2 : 0.14;
   spread = Math.min(spread + w.spread*3, 0.12);
-  player.pitch += w.kind==='ak' ? 0.006 : w.kind==='awp' ? 0.01 : 0.0025;
+  player.pitch += w.kind==='ak' ? 0.006 : (w.kind==='awp'||w.kind==='scout') ? 0.01 : w.kind==='m249' ? 0.008 : 0.0025;
 
   // shell
   spawnShell(
@@ -1545,28 +1557,61 @@ function playerShoot(){
     if(part==='head'){ AudioSys.headshot(); } else { AudioSys.hit(); }
     hitMarker(false);
     const p = hit.point;
-    for(let i=0;i<5;i++){
+    // blood burst (red, directional)
+    for(let i=0;i<8;i++){
       const bp = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.05), new THREE.MeshBasicMaterial({color:0x8a1a1a}));
       bp.position.copy(p);
       scene.add(bp);
-      particles.push({mesh:bp, life:0.4, max:0.4, vx:rand(-1.5,1.5), vy:rand(0.5,2.5), vz:rand(-1.5,1.5), grav:true});
+      particles.push({mesh:bp, life:rand(0.3,0.6), max:0.6, vx:dir.x*rand(1,3)+rand(-1,1), vy:rand(0.5,3), vz:dir.z*rand(1,3)+rand(-1,1), grav:true});
     }
+    // blood stain on ground
+    const stain = makeStain();
+    stain.position.set(b.x + rand(-0.3,0.3), 0.02, b.z + rand(-0.3,0.3));
+    scene.add(stain);
+    particles.push({mesh:stain, life:4, max:4});
   } else if(wallHit){
-    for(let i=0;i<4;i++){
-      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.04), new THREE.MeshBasicMaterial({color:0xffd080}));
+    // impact sparks (bright, fast) + dust (slow)
+    for(let i=0;i<6;i++){
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.03,0.03,0.03), new THREE.MeshBasicMaterial({color:0xffd080}));
       sp.position.set(ex,ey,ez);
       scene.add(sp);
-      particles.push({mesh:sp, life:0.25, max:0.25, vx:rand(-2,2), vy:rand(0,3), vz:rand(-2,2), grav:true});
+      particles.push({mesh:sp, life:0.2, max:0.2, vx:rand(-3,3), vy:rand(0,4), vz:rand(-3,3), grav:true});
     }
+    for(let i=0;i<4;i++){
+      const dp = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.05), new THREE.MeshBasicMaterial({color:0x9a8a6a}));
+      dp.position.set(ex,ey,ez);
+      scene.add(dp);
+      particles.push({mesh:dp, life:0.5, max:0.5, vx:rand(-1.5,1.5), vy:rand(0.5,2), vz:rand(-1.5,1.5), grav:true});
+    }
+    // bullet hole decal (dark dot)
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.01), new THREE.MeshBasicMaterial({color:0x1a1a1a, transparent:true, opacity:0.7}));
+    hole.position.set(ex, ey, ez);
+    hole.lookAt(ox, oy, oz);
+    scene.add(hole);
+    particles.push({mesh:hole, life:6, max:6});
   }
 }
 function addTracer(x1,y1,z1,x2,y2,z2,color){
   const geo = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(x1,y1,z1), new THREE.Vector3(x2,y2,z2)
   ]);
-  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.9, blending:THREE.AdditiveBlending}));
-  scene.add(line);
-  tracers.push({line, life:0.08});
+  // bright core
+  const core = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.95, blending:THREE.AdditiveBlending}));
+  // glow halo (wider, colored)
+  const glow = new THREE.Line(geo, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.45, blending:THREE.AdditiveBlending}));
+  glow.scale.set(1,1,1);
+  scene.add(core); scene.add(glow);
+  tracers.push({line:core, glow, life:0.1, max:0.1});
+}
+function updateTracers(dt){
+  for(const t of tracers){
+    t.life -= dt;
+    const a = clamp(t.life/t.max, 0, 1);
+    t.line.material.opacity = a;
+    if(t.glow) t.glow.material.opacity = a*0.45;
+  }
+  for(const t of tracers) if(t.life <= 0){ scene.remove(t.line); if(t.glow) scene.remove(t.glow); }
+  tracers.splice(0, tracers.length, ...tracers.filter(t=>t.life>0));
 }
 
 function botShoot(b, target){
@@ -1679,6 +1724,10 @@ function updateHUD(){
 }
 function hitMarker(kill){
   hitmarkT = 0.12; hitmarkKill = kill;
+  // pop animation (keep translate centering)
+  const hm = $('hitmarker');
+  hm.style.transform = 'translate(-50%,-50%) scale(1.4)';
+  setTimeout(()=>{ hm.style.transform = 'translate(-50%,-50%) scale(1)'; }, 40);
 }
 // radio messages (CS 1.6 style)
 let radioT = 0;
@@ -2732,9 +2781,7 @@ function updateGrenades(dt){
 
 // ---------- fx ----------
 function updateFx(dt){
-  for(const t of tracers){ t.life -= dt; t.line.material.opacity = t.life/0.08; }
-  for(const t of tracers) if(t.life <= 0) scene.remove(t.line);
-  tracers.splice(0, tracers.length, ...tracers.filter(t=>t.life>0));
+  updateTracers(dt);
   for(const p of particles){
     p.life -= dt;
     if(p.grow){
@@ -2756,7 +2803,13 @@ function updateFx(dt){
   for(const n of dmgNums){
     n.life -= dt;
     n.sprite.position.y += n.vy*dt;
+    n.vy = Math.max(0.2, n.vy - dt*2); // decelerate (pop up then float)
     n.sprite.material.opacity = clamp(n.life/n.max, 0, 1);
+    // crit numbers pop bigger
+    if(n.crit){
+      const s = 1.1 + (1 - n.life/n.max)*0.4;
+      n.sprite.scale.set(s, s*0.5, 1);
+    }
   }
   for(const n of dmgNums) if(n.life <= 0) scene.remove(n.sprite);
   dmgNums.splice(0, dmgNums.length, ...dmgNums.filter(n=>n.life>0));
