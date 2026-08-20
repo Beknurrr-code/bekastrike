@@ -934,9 +934,9 @@ const WEAPON_ICON = {knife:'🔪', usp:'🔫', glock:'🔫', fiveseven:'🔫', d
 
 // ---------- difficulty ----------
 const DIFF = {
-  easy:   {acc:0.25, react:0.55, speed:3.4, hp:90,  dodge:0.15, dmg:0.65},
-  medium: {acc:0.40, react:0.35, speed:3.9, hp:100, dodge:0.3,  dmg:0.9},
-  hard:   {acc:0.62, react:0.2,  speed:4.4, hp:115, dodge:0.45, dmg:1.1}
+  easy:   {acc:0.25, react:0.55, speed:3.4, hp:90,  dodge:0.15, dmg:0.65, burstLen:3, burstPause:1.2},
+  medium: {acc:0.40, react:0.35, speed:3.9, hp:100, dodge:0.3,  dmg:0.9,  burstLen:4, burstPause:0.9},
+  hard:   {acc:0.62, react:0.2,  speed:4.4, hp:115, dodge:0.45, dmg:1.1,  burstLen:5, burstPause:0.6}
 };
 
 // ---------- entities ----------
@@ -1834,8 +1834,15 @@ function botShoot(b, target){
   const ox0 = b.x, oy0 = b.y + 1.4 - b.crouch*0.35, oz0 = b.z;
   const ty0 = target.y + (target===player ? player.eyeH : 1.4);
   if(losBlocked(ox0,oy0,oz0, target.x,ty0,target.z)) return;
+  // burst control: pause between bursts (like a human)
+  if(b.burstCount >= b.diff.burstLen){
+    b.fireT = b.diff.burstPause;
+    b.burstCount = 0;
+    return;
+  }
   if(b.ammo) b.ammo.mag--;
   b.fireT = rate;
+  b.burstCount = (b.burstCount||0) + 1;
   b.burstT = 0.5; // in a burst: follow-up shots are more accurate
   const ox = ox0, oy = oy0, oz = oz0;
   const tx = target.x, ty = ty0, tz = target.z;
@@ -1846,7 +1853,9 @@ function botShoot(b, target){
   // realistic: first shots of a burst are less accurate (bot "warms up")
   if(!b.burstT || b.burstT <= 0) hitChance *= 0.55;
   const isHead = Math.random() < 0.12;
-  const dmg = (isHead ? wd.dmg*wd.head : wd.dmg) * b.diff.dmg;
+  // damage falloff with distance (realistic)
+  const falloff = clamp(1 - d/180, 0.5, 1);
+  const dmg = (isHead ? wd.dmg*wd.head : wd.dmg) * b.diff.dmg * falloff;
   const dx = tx-ox, dy = ty-oy, dz = tz-oz;
   const len = Math.hypot(dx,dy,dz);
   if(len < 0.01) return; // target at same point — no shot
@@ -2941,14 +2950,19 @@ function updateBot(b, dt){
       b.strafeT = rand(0.5, 1.5);
       b.strafeDir = Math.random()<0.5?-1:1;
       b.crouch = (bestD < 15 && Math.random() < 0.3) ? 1 : 0;
-    } else if(b.heard && (performance.now() - b.heard.t) < 3000){
-      b.mode = 'investigate';
-      b.wp = [b.heard.x + rand(-2,2), b.heard.z + rand(-2,2)];
     } else {
-      b.mode = 'patrol';
-      b.crouch = 0;
-      if(!b.wp || dist3(b.x,0,b.z, b.wp[0],0,b.wp[1]) < 2){
-        b.wp = [rand(-35,35), rand(-35,35)];
+      // lost target: reset burst, reposition
+      b.burstCount = 0;
+      b.burstT = 0;
+      if(b.heard && (performance.now() - b.heard.t) < 3000){
+        b.mode = 'investigate';
+        b.wp = [b.heard.x + rand(-2,2), b.heard.z + rand(-2,2)];
+      } else {
+        b.mode = 'patrol';
+        b.crouch = 0;
+        if(!b.wp || dist3(b.x,0,b.z, b.wp[0],0,b.wp[1]) < 2){
+          b.wp = [rand(-35,35), rand(-35,35)];
+        }
       }
     }
   }
@@ -2976,10 +2990,20 @@ function updateBot(b, dt){
     while(dAng < -Math.PI) dAng += Math.PI*2;
     b.yaw += dAng * Math.min(1, dt*8);
     const d = dist3(b.x,0,b.z, tx,0,tz);
-    if(d > 12){ moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw); }
+    // realistic: stop moving to shoot (like CS players)
+    const wantShoot = d < 30 && Math.abs(dAng) < 0.5 && !b.reloading;
+    if(wantShoot && b.burstCount > 0){
+      // hold position while firing
+      moveX = 0; moveZ = 0;
+    } else if(d > 12){ moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw); }
     else if(d < 6){ moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw); }
+    // low HP: retreat to cover (back away)
+    if(b.health < 30 && d < 20){
+      moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw);
+      b.strafeT = 0;
+    }
     b.strafeT -= dt;
-    if(b.strafeT > 0){
+    if(b.strafeT > 0 && !wantShoot){
       moveX += Math.cos(b.yaw) * b.strafeDir * 0.7;
       moveZ += -Math.sin(b.yaw) * b.strafeDir * 0.7;
     }
@@ -2987,7 +3011,7 @@ function updateBot(b, dt){
     if(b.aimT !== undefined && b.aimT > 0){
       b.aimT -= dt;
     } else {
-      if(d < 30 && Math.abs(dAng) < 0.5 && !b.reloading){
+      if(wantShoot){
         botShoot(b, b.target);
       }
     }
