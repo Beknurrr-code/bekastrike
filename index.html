@@ -51,6 +51,7 @@
   #scorebox .rs.over { color:#ff5a4a; }
   #scorebox .bomb { text-align:center; font-size:12px; font-weight:700; color:#ff5a4a; background:rgba(0,0,0,.6); padding:3px 10px; border-radius:4px; margin-top:4px; animation:lowpulse 1s infinite; }
   #scorebox .bomb.urgent { color:#fff; background:rgba(200,0,0,.7); }
+  #scorebox .hostage { text-align:center; font-size:12px; font-weight:700; color:#7ddb6a; background:rgba(0,0,0,.6); padding:3px 10px; border-radius:4px; margin-top:4px; }
   #scorebox .ct { color:#7ec8ff; font-size:22px; font-weight:700; }
   #scorebox .t { color:#ffb37e; font-size:22px; font-weight:700; }
   #scorebox .timer { color:#fff; font-size:18px; font-weight:600; min-width:64px; }
@@ -251,6 +252,7 @@
     </div>
     <div class="rs" id="roundstatelbl">БОЙ</div>
     <div class="bomb" id="bomblbl" style="display:none"></div>
+    <div class="hostage" id="hostagelbl" style="display:none"></div>
   </div>
 
   <div id="killfeed" class="panel"></div>
@@ -595,6 +597,7 @@ const MAPS = {
     name:'de_dust',
     label:'Dust (пустыня)',
     bombPoint:[20,20],
+    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -645,6 +648,7 @@ const MAPS = {
     name:'de_nuke',
     label:'Nuke (склад)',
     bombPoint:[0,20],
+    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -691,6 +695,7 @@ const MAPS = {
     name:'de_inferno',
     label:'Inferno (город)',
     bombPoint:[-20,20],
+    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -1028,6 +1033,96 @@ function respawnBot(b){
   b.reloading = false;
   b.group.visible = true;
   b.shadow.visible = true;
+}
+
+// ---------- hostages (cs_assault) ----------
+let hostages = []; // {x,z,group,follow,leader,rescued,dead,walkT}
+const HOSTAGE_POINTS = [[-20,-20],[-15,-20],[-20,-15]]; // where they stand
+const HOSTAGE_RESCUE = [30,-30]; // rescue zone (CT spawn area)
+function buildHostage(x, z){
+  const g = new THREE.Group();
+  const skin = new THREE.MeshLambertMaterial({color:0xd8a878});
+  const shirt = new THREE.MeshLambertMaterial({color:0x8a5a3a});
+  const pants = new THREE.MeshLambertMaterial({color:0x4a4a52});
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.5,0.2), pants); legL.position.set(-0.08,0.25,0);
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.14,0.5,0.2), pants); legR.position.set(0.08,0.25,0);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.5,0.25), shirt); torso.position.y = 0.9;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.26,0.26,0.26), skin); head.position.y = 1.35;
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.4,0.12), shirt); armL.position.set(-0.26,0.9,0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.4,0.12), shirt); armR.position.set(0.26,0.9,0);
+  [legL,legR,torso,head,armL,armR].forEach(m=>m.castShadow = true);
+  g.add(legL,legR,torso,head,armL,armR);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const h = {x, z, group:g, follow:null, rescued:false, dead:false, walkT:0};
+  // shootable parts
+  for(const part of [head, torso]){
+    part.userData = {hostage:h, part};
+    shootTargets.push(part);
+  }
+  hostages.push(h);
+  return h;
+}
+function resetHostages(){
+  for(const h of hostages){ scene.remove(h.group); }
+  hostages = [];
+  const pts = MAPS[currentMap].hostagePoints || HOSTAGE_POINTS;
+  for(const p of pts) buildHostage(p[0], p[1]);
+}
+function updateHostages(dt){
+  for(const h of hostages){
+    if(h.dead || h.rescued) continue;
+    // follow nearest CT player/bot within 4m
+    let leader = null, bestD = 4;
+    if(player.team === 'CT' && !player.dead){
+      const d = dist3(h.x,0,h.z, player.x,0,player.z);
+      if(d < bestD){ bestD = d; leader = player; }
+    }
+    for(const b of bots){
+      if(b.team !== 'CT' || b.dead) continue;
+      const d = dist3(h.x,0,h.z, b.x,0,b.z);
+      if(d < bestD){ bestD = d; leader = b; }
+    }
+    h.follow = leader;
+    if(leader){
+      // walk toward leader
+      const ang = Math.atan2(leader.x-h.x, leader.z-h.z);
+      const spd = 3.2;
+      h.x += Math.sin(ang)*spd*dt;
+      h.z += Math.cos(ang)*spd*dt;
+      h.group.rotation.y = ang;
+      h.walkT += dt*8;
+      const s = Math.sin(h.walkT*Math.PI*2)*0.1;
+      h.group.children[0].position.x = s*0.5;
+      h.group.children[1].position.x = -s*0.5;
+      // rescue check
+      const dR = dist3(h.x,0,h.z, HOSTAGE_RESCUE[0],0,HOSTAGE_RESCUE[1]);
+      if(dR < 3){
+        h.rescued = true;
+        h.group.visible = false;
+        announce('ЗАЛОЖНИК СПАСЁН!', null, '#7ddb6a', 1.5);
+        AudioSys.tone(900,0.1,0.2,'square');
+        if(leader === player) player.money += 1000;
+        else leader.money = (leader.money||0) + 1000;
+        // all rescued → CT wins round
+        if(roundState === 'live' && hostages.every(x=>x.rescued || x.dead)){
+          endRound('CT', 'ВСЕ ЗАЛОЖНИКИ СПАСЕНЫ');
+        }
+      }
+    } else {
+      h.walkT = 0;
+      h.group.children[0].position.x = 0;
+      h.group.children[1].position.x = 0;
+    }
+    h.group.position.set(h.x, 0, h.z);
+  }
+}
+function hostageKilled(h){
+  h.dead = true;
+  h.group.visible = false;
+  announce('ЗАЛОЖНИК УБИТ! ШТРАФ', null, '#ff5a4a', 1.5);
+  // penalty: killer loses money
+  if(player.team === 'T' && !player.dead) player.money = Math.max(0, player.money - 1500);
 }
 
 // ---------- grenades ----------
@@ -1542,13 +1637,29 @@ function playerShoot(){
   let hit = null;
   for(const h of hits){
     const b = h.object.userData.bot;
+    const hg = h.object.userData.hostage;
     if(b && !b.dead){ hit = h; break; }
+    if(hg && !hg.dead && !hg.rescued){ hit = h; break; }
   }
   const endD = hit ? hit.distance : wallD;
   const ex = ox + dir.x*endD, ey = oy + dir.y*endD, ez = oz + dir.z*endD;
   addTracer(ox,oy,oz, ex,ey,ez, w.kind==='usp'||w.kind==='deagle' ? 0xfff0c0 : 0xffc860);
 
   if(hit){
+    const hg = hit.object.userData.hostage;
+    if(hg){
+      // shot a hostage — kill it (T penalty)
+      hostageKilled(hg);
+      hitMarker(false);
+      const p = hit.point;
+      for(let i=0;i<8;i++){
+        const bp = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.05), new THREE.MeshBasicMaterial({color:0x8a1a1a}));
+        bp.position.copy(p);
+        scene.add(bp);
+        particles.push({mesh:bp, life:rand(0.3,0.6), max:0.6, vx:dir.x*rand(1,3)+rand(-1,1), vy:rand(0.5,3), vz:dir.z*rand(1,3)+rand(-1,1), grav:true});
+      }
+      return;
+    }
     const b = hit.object.userData.bot;
     const part = hit.object.userData.part;
     let dmg = part==='head' ? w.dmg*w.head : w.dmg;
@@ -1701,6 +1812,18 @@ function updateHUD(){
       bi.className = 'bomb';
     } else {
       bi.style.display = 'none';
+    }
+  }
+  // hostage indicator
+  const hl = $('hostagelbl');
+  if(hl){
+    const alive = hostages.filter(h=>!h.dead && !h.rescued).length;
+    const rescued = hostages.filter(h=>h.rescued).length;
+    if(hostages.length > 0){
+      hl.style.display = 'block';
+      hl.textContent = '🕊 Заложники: ' + rescued + '/' + hostages.length + ' спасено' + (alive > 0 ? ' · осталось ' + alive : '');
+    } else {
+      hl.style.display = 'none';
     }
   }
   const ch = $('crosshair');
@@ -1967,6 +2090,7 @@ function startRound(){
     b.hasBomb = false;
     respawnBot(b);
   }
+  resetHostages();
   // clear pickups
   for(const p of pickups){ p.life = 0; scene.remove(p.sprite); }
   pickups.length = 0;
@@ -2670,6 +2794,18 @@ function updateBot(b, dt){
       bomb.defuseT = DEFUSE_T;
     }
   }
+  // CT bots: escort nearby hostage to rescue zone
+  if(b.team === 'CT' && roundState === 'live' && !blinded){
+    const near = hostages.find(h=>!h.dead && !h.rescued && dist3(b.x,0,b.z, h.x,0,h.z) < 4);
+    if(near){
+      const dR = dist3(b.x,0,b.z, HOSTAGE_RESCUE[0],0,HOSTAGE_RESCUE[1]);
+      if(dR > 3){
+        const ang = Math.atan2(HOSTAGE_RESCUE[0]-b.x, HOSTAGE_RESCUE[1]-b.z);
+        b.yaw += (ang - b.yaw) * Math.min(1, dt*3);
+        moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
+      }
+    }
+  }
   // obstacle avoidance: if blocked ahead, slide along the wall
   const aheadX = b.x + moveX*0.6, aheadZ = b.z + moveZ*0.6;
   let blocked = false;
@@ -3234,6 +3370,7 @@ function loop(){
 
   updatePlayer(dt);
   updateBombDefuse(dt);
+  updateHostages(dt);
   // host simulates bots; client renders bot snapshots (no local sim)
   if(net.mode !== 'client'){
     for(const b of bots) updateBot(b, dt);
