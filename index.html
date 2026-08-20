@@ -295,6 +295,7 @@
     <div class="vt" id="victory-title">ПОБЕДА</div>
     <div class="vs" id="victory-sub"></div>
     <button class="btn" id="restart-btn">Играть снова</button>
+    <button class="btn gray" id="nextmap-btn" style="margin-top:10px">🎲 Следующая карта</button>
   </div>
 </div>
 
@@ -738,6 +739,92 @@ const MAPS = {
       addBox(35, -35, 2, 2, 5, 0x8a7a6a, wallTex);
       addBox(-35, 35, 2, 2, 5, 0x8a7a6a, wallTex);
       addBox(35, 35, 2, 2, 5, 0x8a7a6a, wallTex);
+    }
+  },
+  de_train: {
+    name:'de_train',
+    label:'Train (депо)',
+    bombPoint:[0,-20],
+    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
+    ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
+    tSpawns:[[30,30],[30,25],[25,30],[25,25]],
+    build(){
+      const W = 2, H = 6;
+      addBox(0, -MAP/2-W/2, MAP+W*2, W, H, 0x6a5a4a, wallTex);
+      addBox(0,  MAP/2+W/2, MAP+W*2, W, H, 0x6a5a4a, wallTex);
+      addBox(-MAP/2-W/2, 0, W, MAP, H, 0x6a5a4a, wallTex);
+      addBox( MAP/2+W/2, 0, W, MAP, H, 0x6a5a4a, wallTex);
+      // train cars (long boxes)
+      addBox(-10, -8, 4, 16, 3.5, 0x4a6a4a, wallTex);
+      addBox(10, -8, 4, 16, 3.5, 0x4a6a4a, wallTex);
+      addBox(-10, 8, 4, 16, 3.5, 0x4a6a4a, wallTex);
+      addBox(10, 8, 4, 16, 3.5, 0x4a6a4a, wallTex);
+      // central platform
+      addBox(0, 0, 8, 4, 2, 0x8a7a5a, wallTex);
+      // crates
+      addBox(-20, -15, 4, 4, 2, 0xffffff, crateTex);
+      addBox(20, -15, 4, 4, 2, 0xffffff, crateTex);
+      addBox(-20, 15, 4, 4, 2, 0xffffff, crateTex);
+      addBox(20, 15, 4, 4, 2, 0xffffff, crateTex);
+      addBox(-25, 0, 3, 3, 2, 0xffffff, crateTex);
+      addBox(25, 0, 3, 3, 2, 0xffffff, crateTex);
+      // jump platforms
+      addBox(-6, -14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(6, -14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-6, 14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(6, 14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(0, -6, 4, 4, 2, 0xffffff, crateTex);
+      addBox(0, 6, 4, 4, 2, 0xffffff, crateTex);
+      // pillars
+      addBox(-35, -35, 2, 2, 5, 0x6a5a4a, wallTex);
+      addBox(35, -35, 2, 2, 5, 0x6a5a4a, wallTex);
+      addBox(-35, 35, 2, 2, 5, 0x6a5a4a, wallTex);
+      addBox(35, 35, 2, 2, 5, 0x6a5a4a, wallTex);
+    }
+  },
+  cs_office: {
+    name:'cs_office',
+    label:'Office (офис)',
+    bombPoint:[20,-20],
+    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
+    ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
+    tSpawns:[[30,30],[30,25],[25,30],[25,25]],
+    build(){
+      const W = 2, H = 6;
+      addBox(0, -MAP/2-W/2, MAP+W*2, W, H, 0x8a8a9a, wallTex);
+      addBox(0,  MAP/2+W/2, MAP+W*2, W, H, 0x8a8a9a, wallTex);
+      addBox(-MAP/2-W/2, 0, W, MAP, H, 0x8a8a9a, wallTex);
+      addBox( MAP/2+W/2, 0, W, MAP, H, 0x8a8a9a, wallTex);
+      // office rooms
+      addBox(-15, -15, 10, 10, 4, 0x9a9aa8, wallTex);
+      addBox(15, -15, 10, 10, 4, 0x9a9aa8, wallTex);
+      addBox(-15, 15, 10, 10, 4, 0x9a9aa8, wallTex);
+      addBox(15, 15, 10, 10, 4, 0x9a9aa8, wallTex);
+      // central hall
+      addBox(0, 0, 6, 6, 3, 0x8a8a9a, wallTex);
+      // desks (low crates)
+      addBox(-8, -8, 3, 3, 1.5, 0xffffff, crateTex);
+      addBox(8, -8, 3, 3, 1.5, 0xffffff, crateTex);
+      addBox(-8, 8, 3, 3, 1.5, 0xffffff, crateTex);
+      addBox(8, 8, 3, 3, 1.5, 0xffffff, crateTex);
+      addBox(-20, 0, 3, 3, 2, 0xffffff, crateTex);
+      addBox(20, 0, 3, 3, 2, 0xffffff, crateTex);
+      // corridors
+      addBox(-25, -20, 2, 12, 3.5, 0x8a8a9a, wallTex);
+      addBox(25, -20, 2, 12, 3.5, 0x8a8a9a, wallTex);
+      addBox(-25, 20, 2, 12, 3.5, 0x8a8a9a, wallTex);
+      addBox(25, 20, 2, 12, 3.5, 0x8a8a9a, wallTex);
+      // jump platforms
+      addBox(-6, -14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(6, -14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-6, 14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(6, 14, 3, 3, 2, 0xffffff, crateTex);
+      addBox(0, -6, 4, 4, 2, 0xffffff, crateTex);
+      // pillars
+      addBox(-35, -35, 2, 2, 5, 0x8a8a9a, wallTex);
+      addBox(35, -35, 2, 2, 5, 0x8a8a9a, wallTex);
+      addBox(-35, 35, 2, 2, 5, 0x8a8a9a, wallTex);
+      addBox(35, 35, 2, 2, 5, 0x8a8a9a, wallTex);
     }
   }
 };
@@ -2424,6 +2511,17 @@ $('map-next').addEventListener('click', ()=>{
   AudioSys.tone(500,0.05,0.1,'square');
 });
 $('restart-btn').addEventListener('click', restartMatch);
+$('nextmap-btn').addEventListener('click', ()=>{
+  // next random map
+  mapIdx = (mapIdx + 1 + Math.floor(Math.random()*(mapKeys.length-1))) % mapKeys.length;
+  updateMapLabel();
+  buildMap(mapKeys[mapIdx]);
+  $('victory').classList.remove('show');
+  resetMatch();
+  startRound();
+  renderer.domElement.requestPointerLock();
+  AudioSys.round();
+});
 $('bm-close').addEventListener('click', ()=>toggleBuyMenu(false));
 $('pause-resume').addEventListener('click', ()=>{
   $('pause').classList.remove('show');
