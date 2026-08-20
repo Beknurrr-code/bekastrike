@@ -44,6 +44,13 @@
 
   #scorebox { left:50%; top:10px; transform:translateX(-50%); text-align:center; }
   #scorebox .teams { display:flex; align-items:center; gap:10px; background:rgba(0,0,0,.5); padding:4px 14px; border-radius:4px; }
+  #scorebox .rs { text-align:center; font-size:11px; letter-spacing:2px; color:#ffd24a; background:rgba(0,0,0,.5); padding:2px 14px; border-radius:4px; margin-top:4px; }
+  #scorebox .rs.freeze { color:#8ab8ff; }
+  #scorebox .rs.buy { color:#ffd24a; }
+  #scorebox .rs.live { color:#7ddb6a; }
+  #scorebox .rs.over { color:#ff5a4a; }
+  #scorebox .bomb { text-align:center; font-size:12px; font-weight:700; color:#ff5a4a; background:rgba(0,0,0,.6); padding:3px 10px; border-radius:4px; margin-top:4px; animation:lowpulse 1s infinite; }
+  #scorebox .bomb.urgent { color:#fff; background:rgba(200,0,0,.7); }
   #scorebox .ct { color:#7ec8ff; font-size:22px; font-weight:700; }
   #scorebox .t { color:#ffb37e; font-size:22px; font-weight:700; }
   #scorebox .timer { color:#fff; font-size:18px; font-weight:600; min-width:64px; }
@@ -51,6 +58,7 @@
 
   #killfeed { right:16px; top:40px; width:300px; }
   #killfeed .kf { background:rgba(0,0,0,.55); color:#fff; font-size:13px; padding:3px 8px; margin-bottom:3px; border-left:3px solid #888; border-radius:2px; text-shadow:0 1px 2px #000; animation:kfin .2s; }
+  #radio { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); color:#ffd24a; font-size:15px; font-weight:600; text-shadow:0 1px 3px #000; opacity:0; transition:opacity .3s; pointer-events:none; }
   #killfeed .kf .ct { color:#7ec8ff; font-weight:600; }
   #killfeed .kf .t { color:#ffb37e; font-weight:600; }
   #killfeed .kf .w { color:#ffd24a; }
@@ -241,9 +249,12 @@
       <span class="timer" id="timerlbl">10:00</span>
       <span class="t" id="tscore">0</span>
     </div>
+    <div class="rs" id="roundstatelbl">БОЙ</div>
+    <div class="bomb" id="bomblbl" style="display:none"></div>
   </div>
 
   <div id="killfeed" class="panel"></div>
+  <div id="radio"></div>
 </div>
 
 <div id="announce"></div>
@@ -267,7 +278,7 @@
 <!-- Scoreboard -->
 <div id="scoreboard">
   <div class="sb-wrap">
-    <h2>Счёт матча — до 30 убийств</h2>
+    <h2>Счёт матча — до 16 раундов</h2>
     <div class="sb-row head"><span>Игрок</span><span>Убийств</span><span>Смертей</span><span>Деньги</span></div>
     <div id="sb-rows"></div>
   </div>
@@ -314,6 +325,10 @@
     <div class="subtitle">FPS в стиле Counter-Strike</div>
     <button class="btn" id="play-btn">ИГРАТЬ</button>
     <button class="btn gray" id="mp-btn" style="margin-top:10px">🌐 МУЛЬТИПЛЕЕР</button>
+    <div class="team-switch" style="margin-top:10px">
+      <button class="btn small" id="team-ct-btn" style="background:linear-gradient(#4a8ac2,#2f6db5); color:#fff; box-shadow:0 3px 0 #1c3f5e">CT</button>
+      <button class="btn small gray" id="team-t-btn">T</button>
+    </div>
     <div class="set-block" id="menu-settings">
       <div class="set-title">Настройки</div>
       <div class="set-row"><span>Чувствительность</span><input type="range" class="set-sens" min="0.2" max="3" step="0.1"></div>
@@ -711,6 +726,8 @@ const player = {
   cur:'usp',
   cookT:0, // grenade cooking time while LMB held
   flashT:0, // flashbang blindness timer
+  hasBomb:false,
+  skinColor:null,
   ammo:{usp:{mag:12,res:36}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ak:{mag:30,res:90}, awp:{mag:5,res:30}},
   reloading:false, reloadT:0, fireT:0, lastDamager:null,
   moving:false, stepT:0, walkT:0, speed:0
@@ -725,7 +742,7 @@ vmGroup.add(vmGun);
 function buildViewmodel(kind){
   while(vmGun.children.length) vmGun.remove(vmGun.children[0]);
   const mat = new THREE.MeshLambertMaterial({color:0x2a2a2e});
-  const mat2 = new THREE.MeshLambertMaterial({color:0x6e4a24});
+  const mat2 = new THREE.MeshLambertMaterial({color: player.skinColor || 0x6e4a24});
   if(kind==='knife'){
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.3), mat2); b.position.set(0,0,-0.2); vmGun.add(b);
     const h = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.12,0.12), mat); h.position.set(0,-0.05,0.05); vmGun.add(h);
@@ -1113,13 +1130,17 @@ function killEntity(e, attacker, weaponName, weaponKind, part){
     // drop weapon pickup + corpse
     const dropW = bGunName(e);
     corpseDrop(e, dropW);
+    // bomb drops on death
+    if(e.hasBomb){
+      e.hasBomb = false;
+      dropBombPickup(e.x, e.z);
+    }
     e.corpseT = 0.8; // fall animation
     e.shadow.visible = false;
   }
   if(attacker && attacker !== e){
     attacker.kills++;
     attacker.streak = (attacker.streak||0) + 1;
-    if(attacker.team === 'CT') ctScore++; else tScore++;
     if(attacker === player){
       player.money += 300;
       AudioSys.kill();
@@ -1148,6 +1169,13 @@ function killEntity(e, attacker, weaponName, weaponKind, part){
   scene.add(stain);
   particles.push({mesh:stain, life:5, max:5});
   if(started) checkMatchEnd();
+  // round end by elimination
+  if(started && roundState === 'live'){
+    const aliveCT = entities.some(x=>x.team==='CT' && !x.dead);
+    const aliveT = entities.some(x=>x.team==='T' && !x.dead);
+    if(!aliveCT) endRound('T', 'CT УНИЧТОЖЕНЫ');
+    else if(!aliveT) endRound('CT', 'T УНИЧТОЖЕНЫ');
+  }
 }
 function makeStain(){
   const c = document.createElement('canvas'); c.width=c.height=64;
@@ -1420,8 +1448,8 @@ function updateHUD(){
   $('aplbl').textContent = Math.max(0, Math.round(player.armor));
   $('apfill').style.width = Math.max(0, player.armor) + '%';
   $('moneylbl').textContent = '$' + player.money;
-  $('ctscore').textContent = ctScore;
-  $('tscore').textContent = tScore;
+  $('ctscore').textContent = ctRounds;
+  $('tscore').textContent = tRounds;
   const w = WEAPONS[player.cur];
   if(w.kind === 'knife'){
     $('maglbl').textContent = '—';
@@ -1436,11 +1464,34 @@ function updateHUD(){
     $('reslbl').textContent = '/ ' + a.res;
   }
   $('wnamelbl').textContent = w.name;
-  const t = Math.max(0, matchTime);
+  // round timer
+  let t = roundState === 'live' ? roundTime : (roundState === 'freeze' ? roundTime : (roundState === 'buy' ? roundTime : 0));
+  t = Math.max(0, t);
   const mm = Math.floor(t/60), ss = Math.floor(t%60);
   const tl = $('timerlbl');
   tl.textContent = mm + ':' + (ss<10?'0':'') + ss;
-  tl.classList.toggle('warn', t < 60);
+  tl.classList.toggle('warn', t < 20 && roundState === 'live');
+  // round state label
+  const rs = $('roundstatelbl');
+  if(rs){
+    rs.textContent = roundState === 'freeze' ? 'ЗАМОРОЗКА' : roundState === 'buy' ? 'ПОКУПКА' : roundState === 'live' ? 'БОЙ' : 'РАУНД ОКОНЧЕН';
+    rs.className = 'rs ' + roundState;
+  }
+  // bomb indicator
+  const bi = $('bomblbl');
+  if(bi){
+    if(bomb && bomb.planted){
+      bi.style.display = 'block';
+      bi.textContent = '💣 БОМБА: ' + Math.max(0, Math.ceil(bomb.plantT)) + 'с' + (bomb.defusing ? ' · ОБЕЗВРЕЖИВАНИЕ ' + Math.max(0, Math.ceil(bomb.defuseT)) + 'с' : '');
+      bi.className = 'bomb ' + (bomb.plantT < 10 ? 'urgent' : '');
+    } else if(player.hasBomb){
+      bi.style.display = 'block';
+      bi.textContent = '💣 У ТЕБЯ БОМБА — иди на точку [E]';
+      bi.className = 'bomb';
+    } else {
+      bi.style.display = 'none';
+    }
+  }
   const ch = $('crosshair');
   const off = 6 + spread*220;
   ch.querySelector('.ch.t').style.top = (-14-off) + 'px';
@@ -1462,6 +1513,16 @@ function updateHUD(){
 }
 function hitMarker(kill){
   hitmarkT = 0.12; hitmarkKill = kill;
+}
+// radio messages (CS 1.6 style)
+let radioT = 0;
+function radioSay(msg){
+  const el = $('radio');
+  if(!el) return;
+  el.textContent = '📻 ' + player.name + ': ' + msg;
+  el.style.opacity = 1;
+  radioT = 3;
+  AudioSys.tone(900,0.05,0.1,'square');
 }
 function showDmgDir(rel){
   const arc = document.createElement('div');
@@ -1521,7 +1582,8 @@ const BUY_ITEMS = [
   {id:'armor',  name:'Бронежилет',   desc:'Полная броня 100', price:650},
   {id:'he',     name:'HE Граната',    desc:'Урон по площади', price:300},
   {id:'smoke',  name:'Дымовая',       desc:'Дым · слепит ботов', price:300},
-  {id:'flash',  name:'Флешка',        desc:'Ослепляет врагов', price:200}
+  {id:'flash',  name:'Флешка',        desc:'Ослепляет врагов', price:200},
+  {id:'skin',   name:'Скин оружия',   desc:'Случайный цвет ствола', price:150}
 ];
 function buildBuyMenu(){
   const grid = $('bm-grid');
@@ -1539,7 +1601,7 @@ function refreshBuyMenu(){
   $('bm-money').textContent = '$' + player.money;
   for(const div of $('bm-grid').children){
     const id = div.dataset.id;
-    const owned = id==='usp' ? true : id==='armor' ? player.armor>=100 : (id==='he'||id==='smoke'||id==='flash') ? player.weapons[id]>0 : player.weapons[id];
+    const owned = id==='usp' ? true : id==='armor' ? player.armor>=100 : id==='skin' ? !!player.skinColor : (id==='he'||id==='smoke'||id==='flash') ? player.weapons[id]>0 : player.weapons[id];
     div.classList.toggle('owned', !!owned);
     const p = div.querySelector('.p');
     p.classList.toggle('no', player.money < (id==='usp'?0:BUY_ITEMS.find(i=>i.id===id).price));
@@ -1548,6 +1610,16 @@ function refreshBuyMenu(){
 function buyItem(id){
   const it = BUY_ITEMS.find(i=>i.id===id);
   if(id==='usp') return;
+  if(id==='skin'){
+    if(player.money < it.price){ AudioSys.deny(); return; }
+    player.money -= it.price;
+    const colors = [0xff4444,0x44ff44,0x4444ff,0xffaa00,0xff44ff,0x44ffff,0xffffff,0x888888];
+    player.skinColor = colors[Math.floor(Math.random()*colors.length)];
+    buildViewmodel(player.cur);
+    AudioSys.buy();
+    refreshBuyMenu();
+    return;
+  }
   if(id==='armor'){
     if(player.armor >= 100) return;
     if(player.money < it.price){ AudioSys.deny(); return; }
@@ -1600,15 +1672,220 @@ function updateScoreboard(){
   }
 }
 
-// ---------- match ----------
+// ---------- match (rounds like CS 1.6) ----------
 let ctScore = 0, tScore = 0, matchTime = 600, matchOver = false, matchWinner = null;
 let firstBloodDone = false;
+// round system
+let roundNum = 1, roundState = 'freeze'; // freeze | buy | live | over
+let roundTime = 0, roundWinner = null, roundOverT = 0;
+const FREEZE_T = 5, BUY_T = 15, ROUND_T = 105; // seconds
+const MAX_ROUNDS = 16;
+let ctRounds = 0, tRounds = 0;
+let bomb = null; // {x,z,planted,plantT,defuseT,defusing,carrier,mesh}
+const BOMB_POINT = [20, 20]; // plant site (open field, clear path from T spawn)
+const BOMB_FUSE = 40, DEFUSE_T = 5;
+
 function checkMatchEnd(){
   if(matchOver) return;
-  if(ctScore >= 30 || tScore >= 30){
+  if(ctRounds >= MAX_ROUNDS || tRounds >= MAX_ROUNDS){
     matchOver = true;
-    matchWinner = ctScore >= 30 ? 'CT' : 'T';
+    matchWinner = ctRounds >= MAX_ROUNDS ? 'CT' : 'T';
     setTimeout(showVictory, 800);
+  }
+}
+function endRound(winner, reason){
+  if(roundState === 'over') return;
+  roundState = 'over';
+  roundWinner = winner;
+  roundOverT = 4;
+  if(winner === 'CT') ctRounds++; else tRounds++;
+  // money rewards
+  const winMoney = winner === 'CT' ? 3250 : 3500;
+  const loseMoney = 1400;
+  for(const e of entities){
+    if(e.dead || !e.team) continue;
+    if(e.team === winner) e.money = (e.money||0) + winMoney;
+    else e.money = (e.money||0) + loseMoney;
+  }
+  if(bomb && bomb.planted){
+    if(winner === 'T') announce('БОМБА ВЗОРВАНА', null, '#ff5a4a', 2.5);
+    else announce('БОМБА ОБЕЗВРЕЖЕНА', null, '#7ddb6a', 2.5);
+  } else {
+    announce(winner === 'CT' ? 'CT ПОБЕЖДАЮТ РАУНД' : 'T ПОБЕЖДАЮТ РАУНД', null, winner==='CT' ? '#7ddb6a' : '#ffb040', 2);
+  }
+  if(reason) announce(reason, null, '#ffd24a', 1.5);
+  AudioSys.round();
+}
+function startRound(){
+  roundNum++;
+  roundState = 'freeze';
+  roundTime = FREEZE_T;
+  roundWinner = null;
+  // reset bomb
+  if(bomb){
+    if(bomb.mesh) scene.remove(bomb.mesh);
+    bomb = null;
+  }
+  if(bombPickup){ scene.remove(bombPickup); bombPickup = null; }
+  // reset player
+  player.health = 100; player.armor = 100; player.dead = false; player.spawnProtect = 2;
+  player.streak = 0; player.flashT = 0; $('flashfx').style.opacity = 0; player.cookT = 0;
+  player.weapons = {usp:true, deagle:false, mp5:false, ak:false, awp:false, he:0, smoke:0, flash:0};
+  player.cur = 'usp';
+  player.ammo = {usp:{mag:12,res:36}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ak:{mag:30,res:90}, awp:{mag:5,res:30}};
+  const spawns = player.team === 'CT' ? CT_SPAWNS : T_SPAWNS;
+  const s = spawns[Math.floor(Math.random()*spawns.length)];
+  player.x = s[0]; player.z = s[1]; player.y = 0; player.vy = 0;
+  buildViewmodel('usp'); setZoom(false);
+  $('death').classList.remove('show');
+  // reset bots
+  for(const b of bots){
+    b.group.rotation.x = 0; b.group.position.y = 0;
+    b.hasBomb = false;
+    respawnBot(b);
+  }
+  // clear pickups
+  for(const p of pickups){ p.life = 0; scene.remove(p.sprite); }
+  pickups.length = 0;
+  $('killfeed').innerHTML = '';
+  $('announce').classList.remove('show');
+  player.hasBomb = false;
+  // give bomb to a random T bot (or player if T)
+  const tAlive = entities.filter(e=>e.team==='T' && !e.dead);
+  if(tAlive.length){
+    const carrier = tAlive[Math.floor(Math.random()*tAlive.length)];
+    if(carrier === player) player.hasBomb = true;
+    else carrier.hasBomb = true;
+  }
+  announce('РАУНД ' + roundNum, null, '#ffd24a', 1.5);
+  AudioSys.round();
+}
+function resetMatch(){
+  matchOver = false; matchWinner = null;
+  firstBloodDone = false;
+  ctScore = 0; tScore = 0; matchTime = 600;
+  ctRounds = 0; tRounds = 0; roundNum = 0;
+  player.health = 100; player.armor = 100; player.money = 800;
+  player.kills = 0; player.deaths = 0; player.dead = false; player.streak = 0; player.spawnProtect = 0;
+  player.weapons = {usp:true, deagle:false, mp5:false, ak:false, awp:false, he:0, smoke:0, flash:0};
+  player.cur = 'usp';
+  player.ammo = {usp:{mag:12,res:36}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ak:{mag:30,res:90}, awp:{mag:5,res:30}};
+  player.x = CT_SPAWNS[0][0]; player.z = CT_SPAWNS[0][1]; player.y = 0; player.vy = 0;
+  player.flashT = 0; $('flashfx').style.opacity = 0;
+  player.cookT = 0;
+  player.hasBomb = false;
+  for(const b of bots) respawnBot(b);
+  for(const p of pickups){ p.life = 0; scene.remove(p.sprite); }
+  pickups.length = 0;
+  for(const b of bots){ b.group.rotation.x = 0; b.group.position.y = 0; }
+  $('death').classList.remove('show');
+  $('killfeed').innerHTML = '';
+  $('announce').classList.remove('show');
+  buildViewmodel('usp');
+  setZoom(false);
+  roundNum = 0; roundState = 'freeze'; roundTime = FREEZE_T; roundWinner = null;
+  if(bomb){ if(bomb.mesh) scene.remove(bomb.mesh); bomb = null; }
+}
+// ---------- bomb (C4) ----------
+function makeBombMesh(){
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.12,0.2), new THREE.MeshLambertMaterial({color:0x3a3a3a}));
+  const light = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.08,0.08), new THREE.MeshBasicMaterial({color:0xff2020}));
+  light.position.set(0,0.08,0);
+  const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.15,4), new THREE.MeshLambertMaterial({color:0x888888}));
+  antenna.position.set(0.1,0.1,0);
+  g.add(body, light, antenna);
+  return g;
+}
+let bombPickup = null; // dropped bomb on the ground
+function dropBombPickup(x, z){
+  if(bombPickup){ scene.remove(bombPickup); }
+  bombPickup = makeBombMesh();
+  bombPickup.position.set(x, 0.15, z);
+  scene.add(bombPickup);
+}
+function tryPickupBomb(){
+  if(!bombPickup) return false;
+  const d = dist3(player.x, 0, player.z, bombPickup.position.x, 0, bombPickup.position.z);
+  if(d < 1.5 && player.team === 'T'){
+    scene.remove(bombPickup);
+    bombPickup = null;
+    player.hasBomb = true;
+    announce('БОМБА ПОДОБРАНА', null, '#ff5a4a', 1.5);
+    AudioSys.tone(500,0.1,0.15,'square');
+    return true;
+  }
+  return false;
+}
+function bombExplode(){
+  if(!bomb || !bomb.planted) return;
+  bomb.planted = false;
+  // big explosion visuals
+  AudioSys.explosion();
+  const flash = new THREE.PointLight(0xffa040, 8, 60);
+  flash.position.set(bomb.x, 1, bomb.z);
+  scene.add(flash);
+  setTimeout(()=>scene.remove(flash), 300);
+  const sph = new THREE.Mesh(new THREE.SphereGeometry(3,16,16), new THREE.MeshBasicMaterial({color:0xffc060, transparent:true, opacity:0.8, blending:THREE.AdditiveBlending, depthWrite:false}));
+  sph.position.set(bomb.x, 1, bomb.z);
+  scene.add(sph);
+  particles.push({mesh:sph, life:0.5, max:0.5, grow:true});
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1,1.4,32), new THREE.MeshBasicMaterial({color:0xffa040, transparent:true, opacity:0.9, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false}));
+  ring.rotation.x = -Math.PI/2;
+  ring.position.set(bomb.x, 0.1, bomb.z);
+  scene.add(ring);
+  particles.push({mesh:ring, life:0.6, max:0.6, grow:true, ring:true});
+  // damage everyone in radius
+  for(const e of entities){
+    if(e.dead) continue;
+    const d = dist3(e.x, e.y+1, e.z, bomb.x, 1, bomb.z);
+    if(d < 18){
+      const dmg = Math.round(180 * (1 - d/18));
+      if(dmg > 0) damageEntity(e, dmg, 'body', null, 'Взрыв', 'he');
+    }
+  }
+  if(bomb.mesh) scene.remove(bomb.mesh);
+  endRound('T', 'БОМБА ВЗОРВАНА');
+}
+function plantBomb(){
+  if(!player.hasBomb || player.dead) return;
+  if(roundState !== 'live') return;
+  const d = dist3(player.x, 0, player.z, BOMB_POINT[0], 0, BOMB_POINT[1]);
+  if(d > 3){ announce('ПОДОЙДИ К ТОЧКЕ БОМБЫ', null, '#ff5a4a', 1.2); return; }
+  player.hasBomb = false;
+  bomb = {x:BOMB_POINT[0], z:BOMB_POINT[1], planted:true, plantT:BOMB_FUSE, defuseT:0, defusing:false, mesh:makeBombMesh()};
+  bomb.mesh.position.set(bomb.x, 0.1, bomb.z);
+  scene.add(bomb.mesh);
+  announce('БОМБА УСТАНОВЛЕНА!', null, '#ff5a4a', 2);
+  AudioSys.tone(400,0.2,0.3,'square');
+}
+function defuseBomb(){
+  if(!bomb || !bomb.planted || player.dead) return;
+  if(player.team !== 'CT') return;
+  const d = dist3(player.x, 0, player.z, bomb.x, 0, bomb.z);
+  if(d > 2.5){ announce('ПОДОЙДИ К БОМБЕ', null, '#ffd24a', 1.2); return; }
+  if(!bomb.defusing){
+    bomb.defusing = true;
+    bomb.defuseT = DEFUSE_T;
+    announce('ОБЕЗВРЕЖИВАНИЕ…', null, '#7ddb6a', 1.5);
+  }
+}
+function updateBombDefuse(dt){
+  if(!bomb || !bomb.planted || !bomb.defusing) return;
+  // someone must stay near the bomb
+  const playerNear = player.team === 'CT' && !player.dead && dist3(player.x,0,player.z, bomb.x,0,bomb.z) < 2.5;
+  const botNear = bots.some(b=>b.team==='CT' && !b.dead && dist3(b.x,0,b.z, bomb.x,0,bomb.z) < 2);
+  if(!playerNear && !botNear){
+    bomb.defusing = false;
+    bomb.defuseT = 0;
+    return;
+  }
+  bomb.defuseT -= dt;
+  if(bomb.defuseT <= 0){
+    bomb.defusing = false;
+    bomb.planted = false;
+    if(bomb.mesh) scene.remove(bomb.mesh);
+    endRound('CT', 'БОМБА ОБЕЗВРЕЖЕНА');
   }
 }
 function showVictory(){
@@ -1616,7 +1893,7 @@ function showVictory(){
   $('victory-title').textContent = win ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ';
   $('victory-title').className = 'vt ' + (win?'win':'lose');
   const best = [...entities].sort((a,b)=>b.kills-a.kills)[0];
-  $('victory-sub').innerHTML = `Счёт: CT ${ctScore} — ${tScore} T · Твои убийства: ${player.kills}<br><span class="mvp">MVP: ${best.name} — ${best.kills} убийств</span>`;
+  $('victory-sub').innerHTML = `Счёт: CT ${ctRounds} — ${tRounds} T · Твои убийства: ${player.kills}<br><span class="mvp">MVP: ${best.name} — ${best.kills} убийств</span>`;
   $('victory').classList.add('show');
   document.exitPointerLock();
   if(win) AudioSys.victory(); else AudioSys.defeat();
@@ -1676,7 +1953,25 @@ document.addEventListener('keydown', e=>{
   if(e.code === 'Digit4') switchWeapon(player.weapons.he > 0 ? 'he' : player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
   if(e.code === 'Digit5') switchWeapon(player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
   if(e.code === 'Digit6') switchWeapon('flash');
-  if(e.code === 'KeyE' && !player.dead && !$('buymenu').classList.contains('open')) tryPickup();
+  if(e.code === 'KeyE' && !player.dead && !$('buymenu').classList.contains('open')){
+    if(player.hasBomb) plantBomb();
+    else if(bomb && bomb.planted && player.team === 'CT') defuseBomb();
+    else if(tryPickupBomb()) {}
+    else tryPickup();
+  }
+  // radio commands (CS 1.6 style: Z / X / C)
+  if(e.code === 'KeyZ' && !player.dead){
+    const msgs = ['За мной!','Вперёд!','Держи позицию!','Атакуем!','Нужна поддержка!'];
+    radioSay(msgs[Math.floor(Math.random()*msgs.length)]);
+  }
+  if(e.code === 'KeyX' && !player.dead){
+    const msgs = ['Враг замечен!','Враг на точке!','Снайпер!','Осторожно, граната!'];
+    radioSay(msgs[Math.floor(Math.random()*msgs.length)]);
+  }
+  if(e.code === 'KeyC' && !player.dead){
+    const msgs = ['Рапорт: всё чисто','Рапорт: сектор зачищен','Рапорт: нужна помощь!','Рапорт: отступаем'];
+    radioSay(msgs[Math.floor(Math.random()*msgs.length)]);
+  }
   if(e.code === 'Escape' && $('buymenu').classList.contains('open')) toggleBuyMenu(false);
 });
 document.addEventListener('keyup', e=>{
@@ -1733,9 +2028,37 @@ $('play-btn').addEventListener('click', ()=>{
   vmGroup.visible = true; // show weapon in game
   camera.rotation.order = 'YXZ'; // reset camera rotation order after menu
   resetMatch();
+  startRound();
   renderer.domElement.requestPointerLock();
   AudioSys.round();
 });
+function setTeam(team){
+  player.team = team;
+  // update team buttons
+  const ctBtn = $('team-ct-btn'), tBtn = $('team-t-btn');
+  if(ctBtn && tBtn){
+    ctBtn.style.background = team==='CT' ? 'linear-gradient(#4a8ac2,#2f6db5)' : '';
+    ctBtn.style.color = team==='CT' ? '#fff' : '';
+    ctBtn.style.boxShadow = team==='CT' ? '0 3px 0 #1c3f5e' : '';
+    tBtn.style.background = team==='T' ? 'linear-gradient(#c28a4a,#b08d57)' : '';
+    tBtn.style.color = team==='T' ? '#fff' : '';
+    tBtn.style.boxShadow = team==='T' ? '0 3px 0 #5e3c1c' : '';
+  }
+  // respawn at team spawn
+  const spawns = team === 'CT' ? CT_SPAWNS : T_SPAWNS;
+  const s = spawns[Math.floor(Math.random()*spawns.length)];
+  player.x = s[0]; player.z = s[1]; player.y = 0; player.vy = 0;
+  player.health = 100; player.armor = 100; player.dead = false;
+  player.weapons = {usp:true, deagle:false, mp5:false, ak:false, awp:false, he:0, smoke:0, flash:0};
+  player.cur = 'usp';
+  player.ammo = {usp:{mag:12,res:36}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ak:{mag:30,res:90}, awp:{mag:5,res:30}};
+  buildViewmodel('usp');
+  setZoom(false);
+  $('death').classList.remove('show');
+  AudioSys.tone(600,0.1,0.15,'square');
+}
+$('team-ct-btn').addEventListener('click', ()=>setTeam('CT'));
+$('team-t-btn').addEventListener('click', ()=>setTeam('T'));
 $('restart-btn').addEventListener('click', restartMatch);
 $('bm-close').addEventListener('click', ()=>toggleBuyMenu(false));
 $('pause-resume').addEventListener('click', ()=>{
@@ -1817,13 +2140,19 @@ function updatePlayer(dt){
   if(player.dead){
     player.respawnT -= dt;
     const sub = $('death-sub');
-    sub.innerHTML = sub.innerHTML.replace(/Возрождение через \d+…/, 'Возрождение через ' + Math.max(0, Math.ceil(player.respawnT)) + '…');
-    if(player.respawnT <= 0){
+    if(roundState === 'live' || roundState === 'over'){
+      // CS-style: wait for round end
+      sub.innerHTML = 'Убит — жди конца раунда…';
+    } else {
+      sub.innerHTML = sub.innerHTML.replace(/Возрождение через \d+…/, 'Возрождение через ' + Math.max(0, Math.ceil(player.respawnT)) + '…');
+    }
+    if(player.respawnT <= 0 && roundState !== 'live' && roundState !== 'over'){
       $('death').classList.remove('show');
       player.dead = false;
       player.health = 100; player.armor = 100; player.spawnProtect = 2;
-      const s = CT_SPAWNS[Math.floor(Math.random()*CT_SPAWNS.length)];
-      player.x = s[0]; player.z = s[1]; player.y = 0; player.vy = 0;
+      const s = player.team === 'CT' ? CT_SPAWNS : T_SPAWNS;
+      const sp = s[Math.floor(Math.random()*s.length)];
+      player.x = sp[0]; player.z = sp[1]; player.y = 0; player.vy = 0;
       player.weapons = {usp:true, deagle:false, mp5:false, ak:false, awp:false, he:0, smoke:0, flash:0};
       player.cur = 'usp';
       player.ammo = {usp:{mag:12,res:36}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ak:{mag:30,res:90}, awp:{mag:5,res:30}};
@@ -1971,7 +2300,7 @@ function updateBot(b, dt){
       b.group.rotation.x = -Math.PI/2 * Math.min(1, t*1.5);
       b.group.position.y = Math.max(0, 1.7*(1-t*1.2));
     }
-    if(b.respawnT <= 0){
+    if(b.respawnT <= 0 && roundState !== 'live' && roundState !== 'over'){
       b.group.rotation.x = 0;
       b.group.position.y = 0;
       respawnBot(b);
@@ -2058,6 +2387,49 @@ function updateBot(b, dt){
     b.yaw += (ang - b.yaw) * Math.min(1, dt*3);
     moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
   }
+  // bomb carrier: go to bomb point and plant (priority over combat)
+  if(b.hasBomb && roundState === 'live' && !blinded){
+    const dToPoint = dist3(b.x,0,b.z, BOMB_POINT[0],0,BOMB_POINT[1]);
+    if(dToPoint > 2.5){
+      const ang = Math.atan2(BOMB_POINT[0]-b.x, BOMB_POINT[1]-b.z);
+      b.yaw += (ang - b.yaw) * Math.min(1, dt*4);
+      moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
+      b.mode = 'patrol'; // don't fight while carrying
+    } else if(!bomb || !bomb.planted){
+      // plant!
+      bomb = {x:BOMB_POINT[0], z:BOMB_POINT[1], planted:true, plantT:BOMB_FUSE, defuseT:0, defusing:false, mesh:makeBombMesh()};
+      bomb.mesh.position.set(bomb.x, 0.1, bomb.z);
+      scene.add(bomb.mesh);
+      b.hasBomb = false;
+      announce('БОМБА УСТАНОВЛЕНА!', null, '#ff5a4a', 2);
+      AudioSys.tone(400,0.2,0.3,'square');
+    }
+  }
+  // T bots: pick up dropped bomb
+  if(b.team === 'T' && !b.hasBomb && bombPickup && roundState === 'live' && !blinded){
+    const dToPickup = dist3(b.x,0,b.z, bombPickup.position.x,0,bombPickup.position.z);
+    if(dToPickup < 1.5){
+      scene.remove(bombPickup);
+      bombPickup = null;
+      b.hasBomb = true;
+    } else if(dToPickup < 30){
+      const ang = Math.atan2(bombPickup.position.x-b.x, bombPickup.position.z-b.z);
+      b.yaw += (ang - b.yaw) * Math.min(1, dt*4);
+      moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
+    }
+  }
+  // CT bots: go defuse planted bomb
+  if(b.team === 'CT' && bomb && bomb.planted && roundState === 'live' && !blinded){
+    const dToBomb = dist3(b.x,0,b.z, bomb.x,0,bomb.z);
+    if(dToBomb > 2){
+      const ang = Math.atan2(bomb.x-b.x, bomb.z-b.z);
+      b.yaw += (ang - b.yaw) * Math.min(1, dt*4);
+      moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
+    } else if(!bomb.defusing){
+      bomb.defusing = true;
+      bomb.defuseT = DEFUSE_T;
+    }
+  }
   // obstacle avoidance: if blocked ahead, slide along the wall
   const aheadX = b.x + moveX*0.6, aheadZ = b.z + moveZ*0.6;
   let blocked = false;
@@ -2067,23 +2439,34 @@ function updateBot(b, dt){
     }
   }
   if(blocked){
-    // try sliding: keep the perpendicular component
-    const slideX = moveZ, slideZ = -moveX;
-    const sx = b.x + slideX*0.6, sz = b.z + slideZ*0.6;
-    let slideOk = true;
+    // try sliding left, then right
+    const leftX = -moveZ, leftZ = moveX;
+    const rightX = moveZ, rightZ = -moveX;
+    let leftOk = true, rightOk = true;
     for(const c of colliders){
-      if(sx > c.minX-0.45 && sx < c.maxX+0.45 && sz > c.minZ-0.45 && sz < c.maxZ+0.45){
-        slideOk = false; break;
-      }
+      const lx = b.x + leftX*0.6, lz = b.z + leftZ*0.6;
+      if(lx > c.minX-0.45 && lx < c.maxX+0.45 && lz > c.minZ-0.45 && lz < c.maxZ+0.45) leftOk = false;
+      const rx = b.x + rightX*0.6, rz = b.z + rightZ*0.6;
+      if(rx > c.minX-0.45 && rx < c.maxX+0.45 && rz > c.minZ-0.45 && rz < c.maxZ+0.45) rightOk = false;
     }
-    if(slideOk){
-      moveX = slideX * 0.8; moveZ = slideZ * 0.8;
-    } else {
-      // fully stuck: pick a random turn
-      b.yaw += (Math.random()<0.5?1:-1) * 1.2;
+    if(leftOk){ moveX = leftX*0.8; moveZ = leftZ*0.8; }
+    else if(rightOk){ moveX = rightX*0.8; moveZ = rightZ*0.8; }
+    else {
+      // fully stuck: turn around
+      b.yaw += Math.PI;
       moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
     }
   }
+  // unstick: if barely moved for 2s, random turn
+  const movedNow = Math.abs(moveX)+Math.abs(moveZ);
+  if(movedNow > 0.01){
+    b.stuckT = (b.stuckT||0) + dt;
+    if(b.stuckT > 2){
+      b.stuckT = 0;
+      b.yaw += (Math.random()<0.5?1:-1) * 1.5;
+      moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
+    }
+  } else b.stuckT = 0;
   const spd = b.mode==='combat' ? b.speed*1.1 : b.speed*0.7;
   b.x += moveX * spd * dt;
   b.z += moveZ * spd * dt;
@@ -2571,6 +2954,34 @@ function loop(){
   matchClock += dt;
   if(matchClock > 1){ matchClock -= 1; matchTime = Math.max(0, matchTime-1); }
 
+  // round state machine
+  if(roundState === 'freeze'){
+    roundTime -= dt;
+    if(roundTime <= 0){ roundState = 'buy'; roundTime = BUY_T; announce('ПОКУПАЙТЕ ОРУЖИЕ', null, '#ffd24a', 1.2); }
+  } else if(roundState === 'buy'){
+    roundTime -= dt;
+    if(roundTime <= 0){ roundState = 'live'; roundTime = ROUND_T; announce('БОЙ!', null, '#ff5a4a', 1); }
+  } else if(roundState === 'live'){
+    roundTime -= dt;
+    // bomb ticking
+    if(bomb && bomb.planted){
+      bomb.plantT -= dt;
+      if(bomb.plantT <= 0){
+        bombExplode();
+      }
+    }
+    if(roundTime <= 0){
+      // time out: T wins if bomb planted, else CT
+      if(bomb && bomb.planted) endRound('T', 'БОМБА НЕ ОБЕЗВРЕЖЕНА');
+      else endRound('CT', 'ВРЕМЯ ВЫШЛО');
+    }
+  } else if(roundState === 'over'){
+    roundOverT -= dt;
+    if(roundOverT <= 0 && !matchOver){
+      startRound();
+    }
+  }
+
   // multiplayer integration
   if(net.active){
     if(net.mode === 'host') hostTick(dt);
@@ -2578,6 +2989,7 @@ function loop(){
   }
 
   updatePlayer(dt);
+  updateBombDefuse(dt);
   // host simulates bots; client renders bot snapshots (no local sim)
   if(net.mode !== 'client'){
     for(const b of bots) updateBot(b, dt);
@@ -2588,6 +3000,10 @@ function loop(){
 
   dmgVignette = Math.max(0, dmgVignette - dt*1.2);
   hitmarkT = Math.max(0, hitmarkT - dt);
+  if(radioT > 0){
+    radioT -= dt;
+    if(radioT <= 0) $('radio').style.opacity = 0;
+  }
   if(announceT > 0){
     announceT -= dt;
     if(announceT <= 0) $('announce').classList.remove('show');
