@@ -771,18 +771,31 @@ const BOT_WEAPONS = { CT:['mp5','usp'], T:['ak','mp5'] };
 function buildBot(team, name){
   const g = new THREE.Group();
   const skin = new THREE.MeshLambertMaterial({color:0xd8a878});
+  const skinDark = new THREE.MeshLambertMaterial({color:0xb08a5e});
   const pants = new THREE.MeshLambertMaterial({color:0x3a3a40});
   const shirt = new THREE.MeshLambertMaterial({color: team==='CT' ? 0x3a6ea5 : 0xb08d57});
   const dark = new THREE.MeshLambertMaterial({color:0x222226});
+  const boots = new THREE.MeshLambertMaterial({color:0x1c1c20});
 
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.7,0.26), pants); legs.position.y = 0.35;
+  // legs (two separate legs with boots)
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,0.24), pants); legL.position.set(-0.09,0.28,0);
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,0.24), pants); legR.position.set(0.09,0.28,0);
+  const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.1,0.3), boots); bootL.position.set(-0.09,0.02,0.02);
+  const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.1,0.3), boots); bootR.position.set(0.09,0.02,0.02);
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.6,0.3), shirt); torso.position.y = 1.0;
+  // head with face hint
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,0.3), skin); head.position.y = 1.5;
-  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.14), shirt); armL.position.set(-0.32,1.05,0);
-  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.5,0.14), shirt); armR.position.set(0.32,1.05,0);
+  const face = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,0.02), skinDark); face.position.set(0,1.5,-0.16);
+  // arms with hands
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.45,0.14), shirt); armL.position.set(-0.32,1.02,0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.45,0.14), shirt); armR.position.set(0.32,1.02,0);
+  const handL = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.12), skin); handL.position.set(-0.32,0.75,0);
+  const handR = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.12), skin); handR.position.set(0.32,0.75,0);
+  // gun with barrel
   const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,0.5), dark); gun.position.set(0.3,1.15,-0.3);
-  [legs,torso,head,armL,armR,gun].forEach(m=>m.castShadow = true);
-  g.add(legs,torso,head,armL,armR,gun);
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.25), dark); barrel.position.set(0.3,1.15,-0.55);
+  [legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel].forEach(m=>m.castShadow = true);
+  g.add(legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel);
 
   const bot = {
     team, name, group:g, x:0, z:0, y:0, vy:0, onGround:true,
@@ -794,7 +807,7 @@ function buildBot(team, name){
     lastDamager:null, money:800, diff:DIFF[settings.diff]
   };
   bot.ammo = {mag:WEAPONS[bot.weapon].mag, res:WEAPONS[bot.weapon].reserve};
-  const parts = {head, torso, legs, armL, armR};
+  const parts = {head, torso, legs:legL, armL, armR};
   for(const k in parts){
     parts[k].userData = {bot, part:k};
     shootTargets.push(parts[k]);
@@ -1380,6 +1393,7 @@ function botShoot(b, target){
   const dmg = (w==='ak' ? (isHead?40:20) : w==='mp5' ? (isHead?24:12) : (isHead?16:8)) * b.diff.dmg;
   const dx = tx-ox, dy = ty-oy, dz = tz-oz;
   const len = Math.hypot(dx,dy,dz);
+  if(len < 0.01) return; // target at same point — no shot
   const ux = dx/len, uy = dy/len, uz = dz/len;
   const ex = ox + ux*len, ey = oy + uy*len, ez = oz + uz*len;
   addTracer(ox,oy,oz, ex,ey,ez, 0xffa060);
@@ -1656,11 +1670,11 @@ document.addEventListener('keydown', e=>{
   if(e.code === 'KeyB') toggleBuyMenu(!$('buymenu').classList.contains('open'));
   if(e.code === 'KeyR' && !player.dead) startReload();
   if(e.code === 'KeyM'){ AudioSys.muted = !AudioSys.muted; if(AudioSys.master) AudioSys.master.gain.value = AudioSys.muted ? 0 : settings.vol; }
-  if(e.code === 'Digit1') switchWeapon('knife');
+  if(e.code === 'Digit1') switchWeapon(player.weapons.awp ? 'awp' : player.weapons.ak ? 'ak' : player.weapons.mp5 ? 'mp5' : null);
   if(e.code === 'Digit2') switchWeapon(player.weapons.deagle ? 'deagle' : 'usp');
-  if(e.code === 'Digit3') switchWeapon(player.weapons.awp ? 'awp' : player.weapons.ak ? 'ak' : player.weapons.mp5 ? 'mp5' : null);
-  if(e.code === 'Digit4') switchWeapon('he');
-  if(e.code === 'Digit5') switchWeapon('smoke');
+  if(e.code === 'Digit3') switchWeapon('knife');
+  if(e.code === 'Digit4') switchWeapon(player.weapons.he > 0 ? 'he' : player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
+  if(e.code === 'Digit5') switchWeapon(player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
   if(e.code === 'Digit6') switchWeapon('flash');
   if(e.code === 'KeyE' && !player.dead && !$('buymenu').classList.contains('open')) tryPickup();
   if(e.code === 'Escape' && $('buymenu').classList.contains('open')) toggleBuyMenu(false);
@@ -1680,7 +1694,7 @@ document.addEventListener('mouseup', e=>{ if(e.button === 0) mouseDown = false; 
 document.addEventListener('contextmenu', e=>e.preventDefault());
 document.addEventListener('wheel', e=>{
   if(player.dead || $('buymenu').classList.contains('open')) return;
-  const order = ['knife','usp','ak','he','smoke','flash'];
+  const order = ['ak','usp','knife','he','smoke','flash'];
   const cur = order.indexOf(player.cur);
   const next = e.deltaY > 0 ? (cur+1)%order.length : (cur-1+order.length)%order.length;
   const target = order[next];
@@ -2044,6 +2058,32 @@ function updateBot(b, dt){
     b.yaw += (ang - b.yaw) * Math.min(1, dt*3);
     moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
   }
+  // obstacle avoidance: if blocked ahead, slide along the wall
+  const aheadX = b.x + moveX*0.6, aheadZ = b.z + moveZ*0.6;
+  let blocked = false;
+  for(const c of colliders){
+    if(aheadX > c.minX-0.45 && aheadX < c.maxX+0.45 && aheadZ > c.minZ-0.45 && aheadZ < c.maxZ+0.45){
+      blocked = true; break;
+    }
+  }
+  if(blocked){
+    // try sliding: keep the perpendicular component
+    const slideX = moveZ, slideZ = -moveX;
+    const sx = b.x + slideX*0.6, sz = b.z + slideZ*0.6;
+    let slideOk = true;
+    for(const c of colliders){
+      if(sx > c.minX-0.45 && sx < c.maxX+0.45 && sz > c.minZ-0.45 && sz < c.maxZ+0.45){
+        slideOk = false; break;
+      }
+    }
+    if(slideOk){
+      moveX = slideX * 0.8; moveZ = slideZ * 0.8;
+    } else {
+      // fully stuck: pick a random turn
+      b.yaw += (Math.random()<0.5?1:-1) * 1.2;
+      moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
+    }
+  }
   const spd = b.mode==='combat' ? b.speed*1.1 : b.speed*0.7;
   b.x += moveX * spd * dt;
   b.z += moveZ * spd * dt;
@@ -2065,18 +2105,26 @@ function updateBot(b, dt){
   b.group.position.set(b.x, b.y, b.z);
   b.group.rotation.y = b.yaw;
   b.shadow.position.set(b.x, 0.02, b.z);
-  // crouch visual
-  b.group.children[1].position.y = 1.0 - b.crouch*0.2;
-  b.group.children[2].position.y = 1.5 - b.crouch*0.35;
+  // crouch visual (torso=4, head=5)
+  b.group.children[4].position.y = 1.0 - b.crouch*0.2;
+  b.group.children[5].position.y = 1.5 - b.crouch*0.35;
   const moving = Math.abs(moveX)+Math.abs(moveZ) > 0.01;
   if(moving){
     b.walkT = (b.walkT||0) + dt*9;
     const s = Math.sin(b.walkT*Math.PI*2)*0.12;
-    b.group.children[0].position.x = s*0.5;
+    b.group.children[0].position.x = s*0.5;   // legL
     b.group.children[0].position.z = -s*0.5;
+    b.group.children[1].position.x = -s*0.5;  // legR
+    b.group.children[1].position.z = s*0.5;
+    b.group.children[7].rotation.x = s*0.6;   // armL swing
+    b.group.children[8].rotation.x = -s*0.6;  // armR swing
   } else {
     b.group.children[0].position.x = 0;
     b.group.children[0].position.z = 0;
+    b.group.children[1].position.x = 0;
+    b.group.children[1].position.z = 0;
+    b.group.children[7].rotation.x = 0;
+    b.group.children[8].rotation.x = 0;
   }
 }
 
@@ -2166,15 +2214,26 @@ function netSayTo(id, obj){
 function makeRemoteMesh(team){
   const g = new THREE.Group();
   const skin = new THREE.MeshLambertMaterial({color:0xd8a878});
+  const skinDark = new THREE.MeshLambertMaterial({color:0xb08a5e});
   const pants = new THREE.MeshLambertMaterial({color:0x3a3a40});
   const shirt = new THREE.MeshLambertMaterial({color: team==='CT' ? 0x2f6db5 : 0xb08d57});
   const dark = new THREE.MeshLambertMaterial({color:0x222226});
-  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.7,0.26), pants); legs.position.y = 0.35;
+  const boots = new THREE.MeshLambertMaterial({color:0x1c1c20});
+  const legL = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,0.24), pants); legL.position.set(-0.09,0.28,0);
+  const legR = new THREE.Mesh(new THREE.BoxGeometry(0.16,0.55,0.24), pants); legR.position.set(0.09,0.28,0);
+  const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.1,0.3), boots); bootL.position.set(-0.09,0.02,0.02);
+  const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.1,0.3), boots); bootR.position.set(0.09,0.02,0.02);
   const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.6,0.3), shirt); torso.position.y = 1.0;
   const head = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,0.3), skin); head.position.y = 1.5;
+  const face = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,0.02), skinDark); face.position.set(0,1.5,-0.16);
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.45,0.14), shirt); armL.position.set(-0.32,1.02,0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.45,0.14), shirt); armR.position.set(0.32,1.02,0);
+  const handL = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.12), skin); handL.position.set(-0.32,0.75,0);
+  const handR = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.12), skin); handR.position.set(0.32,0.75,0);
   const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,0.5), dark); gun.position.set(0.3,1.15,-0.3);
-  [legs,torso,head,gun].forEach(m=>m.castShadow = true);
-  g.add(legs,torso,head,gun);
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.25), dark); barrel.position.set(0.3,1.15,-0.55);
+  [legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel].forEach(m=>m.castShadow = true);
+  g.add(legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel);
   g.visible = false;
   scene.add(g);
   return g;
