@@ -934,9 +934,9 @@ const WEAPON_ICON = {knife:'🔪', usp:'🔫', glock:'🔫', fiveseven:'🔫', d
 
 // ---------- difficulty ----------
 const DIFF = {
-  easy:   {acc:0.35, react:0.5,  speed:3.8, hp:100, dodge:0.1,  dmg:0.8},
-  medium: {acc:0.55, react:0.3,  speed:4.2, hp:100, dodge:0.25, dmg:1.0},
-  hard:   {acc:0.75, react:0.18, speed:4.6, hp:120, dodge:0.4,  dmg:1.2}
+  easy:   {acc:0.25, react:0.55, speed:3.4, hp:90,  dodge:0.15, dmg:0.65},
+  medium: {acc:0.40, react:0.35, speed:3.9, hp:100, dodge:0.3,  dmg:0.9},
+  hard:   {acc:0.62, react:0.2,  speed:4.4, hp:115, dodge:0.45, dmg:1.1}
 };
 
 // ---------- entities ----------
@@ -1830,27 +1830,36 @@ function botShoot(b, target){
   const rate = wd.rate || 0.22;
   if(b.fireT > 0) return;
   if(b.ammo && b.ammo.mag <= 0){ return; }
+  // FIX: never shoot through walls — check line of sight right now
+  const ox0 = b.x, oy0 = b.y + 1.4 - b.crouch*0.35, oz0 = b.z;
+  const ty0 = target.y + (target===player ? player.eyeH : 1.4);
+  if(losBlocked(ox0,oy0,oz0, target.x,ty0,target.z)) return;
   if(b.ammo) b.ammo.mag--;
   b.fireT = rate;
-  const ox = b.x, oy = b.y + 1.4 - b.crouch*0.35, oz = b.z;
-  const tx = target.x, ty = target.y + (target===player ? player.eyeH : 1.4), tz = target.z;
+  b.burstT = 0.5; // in a burst: follow-up shots are more accurate
+  const ox = ox0, oy = oy0, oz = oz0;
+  const tx = target.x, ty = ty0, tz = target.z;
   const d = dist3(ox,oy,oz,tx,ty,tz);
   const moving = b.mode==='combat' && Math.abs(b.strafeT) > 0;
   let hitChance = clamp(b.diff.acc - d*0.008 - (moving?0.12:0) - (b.crouch?0.05:0), 0.05, b.diff.acc);
   if(smokeBetween(b.x,b.z,target.x,target.z)) hitChance *= 0.15;
+  // realistic: first shots of a burst are less accurate (bot "warms up")
+  if(!b.burstT || b.burstT <= 0) hitChance *= 0.55;
   const isHead = Math.random() < 0.12;
   const dmg = (isHead ? wd.dmg*wd.head : wd.dmg) * b.diff.dmg;
   const dx = tx-ox, dy = ty-oy, dz = tz-oz;
   const len = Math.hypot(dx,dy,dz);
   if(len < 0.01) return; // target at same point — no shot
   const ux = dx/len, uy = dy/len, uz = dz/len;
-  const ex = ox + ux*len, ey = oy + uy*len, ez = oz + uz*len;
+  // aim spread: bullets land near the target, not exactly on it
+  const spreadR = 0.35 * (1 - b.diff.acc) + 0.15; // meters of error
+  const ex = ox + ux*len + rand(-spreadR,spreadR), ey = oy + uy*len + rand(-spreadR,spreadR), ez = oz + uz*len + rand(-spreadR,spreadR);
   addTracer(ox,oy,oz, ex,ey,ez, 0xffa060);
   const vol = clamp(1 - d/40, 0.15, 1);
   AudioSys.shot('bot', vol);
   spawnShell(b.x + Math.cos(b.yaw)*0.3, b.y + 1.2, b.z - Math.sin(b.yaw)*0.3, -Math.cos(b.yaw), Math.sin(b.yaw));
   if(Math.random() < hitChance){
-    damageEntity(target, dmg, isHead?'head':'body', b, w==='ak'?'AK-47':w==='mp5'?'MP5-SD':'USP-S', w);
+    damageEntity(target, dmg, isHead?'head':'body', b, wd.name, w);
     // host: bot hit a remote client — tell the client
     if(net.mode === 'host' && target.id !== undefined && net.conns.has(target.id)){
       netSayTo(target.id, {t:'youhit', dmg:Math.round(dmg), part:isHead?'head':'body'});
@@ -2902,6 +2911,8 @@ function updateBot(b, dt){
   b.spawnProtect = Math.max(0, b.spawnProtect - dt);
   if(b.flashT > 0) b.flashT = Math.max(0, b.flashT - dt);
   b.fireT -= dt;
+  // burst warm-up: resets when not shooting
+  if(b.burstT !== undefined) b.burstT -= dt;
   b.thinkT -= dt;
   if(b.thinkT <= 0){
     b.thinkT = rand(0.2, 0.4);
@@ -2926,6 +2937,7 @@ function updateBot(b, dt){
     b.target = best;
     if(best){
       b.mode = 'combat';
+      b.aimT = b.diff.react; // reaction delay before first shot
       b.strafeT = rand(0.5, 1.5);
       b.strafeDir = Math.random()<0.5?-1:1;
       b.crouch = (bestD < 15 && Math.random() < 0.3) ? 1 : 0;
@@ -2971,8 +2983,13 @@ function updateBot(b, dt){
       moveX += Math.cos(b.yaw) * b.strafeDir * 0.7;
       moveZ += -Math.sin(b.yaw) * b.strafeDir * 0.7;
     }
-    if(d < 30 && Math.abs(dAng) < 0.5 && !b.reloading){
-      botShoot(b, b.target);
+    // reaction delay: bot aims for a moment before first shot
+    if(b.aimT !== undefined && b.aimT > 0){
+      b.aimT -= dt;
+    } else {
+      if(d < 30 && Math.abs(dAng) < 0.5 && !b.reloading){
+        botShoot(b, b.target);
+      }
     }
   } else if(b.wp && !blinded){
     const ang = Math.atan2(b.wp[0]-b.x, b.wp[1]-b.z);
