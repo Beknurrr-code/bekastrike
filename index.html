@@ -60,6 +60,14 @@
   #killfeed { right:16px; top:40px; width:300px; }
   #killfeed .kf { background:rgba(0,0,0,.55); color:#fff; font-size:13px; padding:3px 8px; margin-bottom:3px; border-left:3px solid #888; border-radius:2px; text-shadow:0 1px 2px #000; animation:kfin .2s; }
   #radio { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); color:#ffd24a; font-size:15px; font-weight:600; text-shadow:0 1px 3px #000; opacity:0; transition:opacity .3s; pointer-events:none; }
+  #chatbox { position:absolute; left:16px; bottom:16px; width:420px; max-height:200px; overflow:hidden; display:flex; flex-direction:column-reverse; pointer-events:none; z-index:6; }
+  #chatbox .msg { color:#eee; font-size:14px; text-shadow:0 1px 2px #000; padding:1px 0; }
+  #chatbox .msg .who { font-weight:700; }
+  #chatbox .msg.team .who { color:#7ec8ff; }
+  #chatbox .msg.sys { color:#ffd24a; font-style:italic; }
+  #chatinput-wrap { position:fixed; left:16px; bottom:16px; z-index:70; display:none; }
+  #chatinput { width:420px; padding:8px 12px; font-size:14px; background:rgba(10,12,16,.85); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:4px; outline:none; }
+  #chatinput::placeholder { color:#889; }
   #killfeed .kf .ct { color:#7ec8ff; font-weight:600; }
   #killfeed .kf .t { color:#ffb37e; font-weight:600; }
   #killfeed .kf .w { color:#ffd24a; }
@@ -257,6 +265,7 @@
 
   <div id="killfeed" class="panel"></div>
   <div id="radio"></div>
+  <div id="chatbox"></div>
 </div>
 
 <div id="announce"></div>
@@ -298,6 +307,9 @@
     <button class="btn gray" id="nextmap-btn" style="margin-top:10px">🎲 Следующая карта</button>
   </div>
 </div>
+
+<!-- Chat input -->
+<div id="chatinput-wrap"><input id="chatinput" placeholder="Сообщение… [Enter] отправить, [Esc] закрыть" maxlength="120"></div>
 
 <!-- Pause -->
 <div id="pause">
@@ -1849,6 +1861,42 @@ function botShoot(b, target){
 // ---------- HUD ----------
 let dmgVignette = 0, shake = 0, spread = 0, vmKick = 0, hitmarkT = 0, hitmarkKill = false;
 let awpZoom = false;
+// spectator mode (watch alive players while dead)
+let spectTarget = null;
+function spectatorTargets(){
+  const list = [];
+  for(const b of bots) if(!b.dead) list.push(b);
+  if(net.active){
+    for(const r of net.remote.values()) if(!r.dead && r.group) list.push(r);
+  }
+  return list;
+}
+function spectateNext(){
+  const list = spectatorTargets();
+  if(list.length === 0) return;
+  const idx = list.indexOf(spectTarget);
+  spectTarget = list[(idx + 1) % list.length];
+}
+function updateSpectator(dt){
+  if(!spectTarget || (spectTarget.dead)){
+    const list = spectatorTargets();
+    if(list.length === 0){ spectTarget = null; return; }
+    spectTarget = list[Math.floor(Math.random()*list.length)];
+  }
+  const t = spectTarget;
+  // smooth follow
+  const tx = t.x, ty = (t.y||0) + 1.6, tz = t.z;
+  camera.position.x += (tx - camera.position.x) * Math.min(1, dt*6);
+  camera.position.y += (ty - camera.position.y) * Math.min(1, dt*6);
+  camera.position.z += (tz - camera.position.z) * Math.min(1, dt*6);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = t.yaw || 0;
+  camera.rotation.x = -0.3;
+  vmGroup.visible = false;
+  const sub = $('death-sub');
+  sub.innerHTML = `Наблюдение: <b>${t.name}</b> (${t.team==='CT'?'CT':'T'}) · HP ${Math.max(0,Math.round(t.health||t.hp||100))}<br>ЛКМ — следующая цель`;
+  $('death').classList.add('show');
+}
 
 function updateHUD(){
   $('hplbl').textContent = Math.max(0, Math.round(player.health));
@@ -1948,6 +1996,72 @@ function radioSay(msg){
   el.style.opacity = 1;
   radioT = 3;
   AudioSys.tone(900,0.05,0.1,'square');
+}
+// ---------- chat (CS 1.6: Enter=global, U=team) ----------
+const chatMsgs = [];
+function chatLog(text, scope, who){
+  const box = $('chatbox');
+  if(!box) return;
+  const div = document.createElement('div');
+  div.className = 'msg' + (scope==='team' ? ' team' : '') + (scope==='sys' ? ' sys' : '');
+  if(who){
+    const w = document.createElement('span');
+    w.className = 'who';
+    w.textContent = who + ': ';
+    div.appendChild(w);
+  }
+  div.appendChild(document.createTextNode(text));
+  box.appendChild(div);
+  while(box.children.length > 30) box.removeChild(box.firstChild);
+  chatMsgs.push({text, scope, who, t:performance.now()});
+  while(chatMsgs.length > 50) chatMsgs.shift();
+}
+function chatSend(text, teamOnly){
+  text = (text||'').trim();
+  if(!text) return;
+  const scope = teamOnly ? 'team' : 'all';
+  chatLog(text, scope, player.name);
+  // multiplayer: broadcast (host) or send to host (client)
+  if(net.active){
+    if(net.mode === 'host'){
+      netBroadcast({t:'chat', txt:text, sc:scope, who:player.name});
+    } else if(net.mode === 'client' && net.conn){
+      netSay(net.conn, {t:'chat', txt:text, sc:scope, who:player.name});
+    }
+  }
+  AudioSys.tone(700,0.04,0.08,'square');
+}
+function chatOpen(scope){
+  if($('chatinput-wrap').style.display === 'block') return;
+  $('chatinput-wrap').style.display = 'block';
+  const inp = $('chatinput');
+  inp.dataset.scope = scope;
+  inp.placeholder = scope==='team' ? 'Команда ' + player.team + ': сообщение…' : 'Все: сообщение…';
+  inp.value = '';
+  document.exitPointerLock();
+  setTimeout(()=>inp.focus(), 50);
+}
+function chatClose(){
+  $('chatinput-wrap').style.display = 'none';
+  $('chatinput').value = '';
+  if(started && !player.dead && !matchOver && !$('buymenu').classList.contains('open')){
+    renderer.domElement.requestPointerLock();
+  }
+}
+$('chatinput').addEventListener('keydown', e=>{
+  e.stopPropagation();
+  if(e.code === 'Enter'){
+    chatSendFromInput();
+  } else if(e.code === 'Escape'){
+    chatClose();
+  }
+});
+function chatSendFromInput(){
+  const inp = $('chatinput');
+  const text = inp.value;
+  const scope = inp.dataset.scope || 'all';
+  chatClose();
+  chatSend(text, scope==='team');
 }
 function showDmgDir(rel){
   const arc = document.createElement('div');
@@ -2407,6 +2521,15 @@ document.addEventListener('keydown', e=>{
     radioSay(msgs[Math.floor(Math.random()*msgs.length)]);
   }
   if(e.code === 'Escape' && $('buymenu').classList.contains('open')) toggleBuyMenu(false);
+  // chat: Enter = global, U = team (CS 1.6 style)
+  if(e.code === 'Enter' && $('chatinput-wrap').style.display !== 'block'){
+    e.preventDefault();
+    chatOpen('all');
+  }
+  if(e.code === 'KeyU' && $('chatinput-wrap').style.display !== 'block'){
+    e.preventDefault();
+    chatOpen('team');
+  }
 });
 document.addEventListener('keyup', e=>{
   if(e.code === 'Tab') $('scoreboard').classList.remove('open');
@@ -2414,6 +2537,10 @@ document.addEventListener('keyup', e=>{
 });
 document.addEventListener('mousedown', e=>{
   if(e.button === 0) mouseDown = true;
+  // spectator: LMB switches target
+  if(e.button === 0 && player.dead && (roundState === 'live' || roundState === 'over')){
+    spectateNext();
+  }
   if(e.button === 2 && !player.dead && !$('buymenu').classList.contains('open')){
     if(player.cur === 'awp') toggleZoom();
     else switchWeapon('knife');
@@ -2603,14 +2730,17 @@ function updatePlayer(dt){
     player.respawnT -= dt;
     const sub = $('death-sub');
     if(roundState === 'live' || roundState === 'over'){
-      // CS-style: wait for round end
-      sub.innerHTML = 'Убит — жди конца раунда…';
+      // CS-style: wait for round end — spectator mode
+      spectTarget = spectTarget || null;
+      updateSpectator(dt);
     } else {
       sub.innerHTML = sub.innerHTML.replace(/Возрождение через \d+…/, 'Возрождение через ' + Math.max(0, Math.ceil(player.respawnT)) + '…');
     }
     if(player.respawnT <= 0 && roundState !== 'live' && roundState !== 'over'){
       $('death').classList.remove('show');
+      spectTarget = null;
       player.dead = false;
+      vmGroup.visible = true;
       player.health = 100; player.armor = 100; player.spawnProtect = 2;
       const s = player.team === 'CT' ? CT_SPAWNS : T_SPAWNS;
       const sp = s[Math.floor(Math.random()*s.length)];
@@ -3120,6 +3250,17 @@ function hostHandleConn(conn){
       hostResolveShoot(msg);
     } else if(msg.t==='started'){
       // client confirms it started — nothing needed
+    } else if(msg.t==='chat'){
+      // relay team chat to teammates only, global to everyone
+      if(msg.sc === 'all'){
+        netBroadcast({t:'chat', txt:msg.txt, sc:'all', who:msg.who});
+        chatLog(msg.txt, 'all', msg.who);
+      } else {
+        const from = net.remote.get(conn.peer);
+        const team = from ? from.team : player.team;
+        netBroadcast({t:'chat', txt:msg.txt, sc:'team', who:msg.who, tm:team});
+        if(player.team === team) chatLog(msg.txt, 'team', msg.who);
+      }
     }
   });
   conn.on('close', ()=>{
@@ -3362,6 +3503,10 @@ function lbJoin(){
         }
       }
       else if(msg.t==='hp'){ /* host authoritative */ }
+      else if(msg.t==='chat'){
+        if(msg.sc === 'all') chatLog(msg.txt, 'all', msg.who);
+        else if(player.team === msg.tm) chatLog(msg.txt, 'team', msg.who);
+      }
       else if(msg.t==='start'){
         startMultiplayerMatch();
       }
