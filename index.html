@@ -135,6 +135,10 @@
 
   /* Buy menu */
   #buymenu { position:fixed; inset:0; z-index:40; background:rgba(5,7,10,.92); display:none; }
+  #buymenu .bm-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
+  #buymenu .bm-tab { pointer-events:auto; padding:6px 14px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:4px; cursor:pointer; }
+  #buymenu .bm-tab:hover { background:rgba(255,255,255,.15); }
+  #buymenu .bm-tab.on { background:#ffd24a; color:#111; border-color:#ffd24a; }
   #buymenu.open { display:block; }
   #buymenu .bm-wrap { max-width:820px; margin:6vh auto 0; padding:0 20px; }
   #buymenu h2 { color:#ffd24a; font-size:22px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
@@ -280,9 +284,10 @@
   <div class="bm-wrap">
     <h2>Магазин</h2>
     <div class="bm-money">Баланс: <span id="bm-money">$800</span></div>
+    <div class="bm-tabs" id="bm-tabs"></div>
     <div class="bm-grid" id="bm-grid"></div>
     <button class="bm-close" id="bm-close">Закрыть [B]</button>
-    <div class="bm-hint">Нож и USP-S — бесплатно. AWP: ПКМ — зум. Дым слепит ботов, флешка — ослепляет.</div>
+    <div class="bm-hint">Нож и USP-S — бесплатно. AWP/Scout: ПКМ — зум. Дым слепит ботов, флешка — ослепляет.</div>
   </div>
 </div>
 
@@ -844,6 +849,7 @@ function buildMap(name){
   // clear old map
   for(const c of colliders) scene.remove(c.mesh);
   colliders.length = 0;
+  if(bombSiteMarker) scene.remove(bombSiteMarker);
   const m = MAPS[name] || MAPS.de_dust;
   currentMap = name;
   m.build();
@@ -852,7 +858,29 @@ function buildMap(name){
   CT_SPAWNS.length = 0; T_SPAWNS.length = 0;
   for(const s of m.ctSpawns) CT_SPAWNS.push(s);
   for(const s of m.tSpawns) T_SPAWNS.push(s);
+  // bomb site marker (yellow circle on the ground)
+  const bc = document.createElement('canvas'); bc.width = bc.height = 128;
+  const bg = bc.getContext('2d');
+  const gr = bg.createRadialGradient(64,64,8,64,64,60);
+  gr.addColorStop(0,'rgba(255,210,74,0.55)');
+  gr.addColorStop(0.7,'rgba(255,210,74,0.2)');
+  gr.addColorStop(1,'rgba(255,210,74,0)');
+  bg.fillStyle = gr; bg.fillRect(0,0,128,128);
+  bg.strokeStyle = 'rgba(255,210,74,0.8)'; bg.lineWidth = 4;
+  bg.beginPath(); bg.arc(64,64,50,0,7); bg.stroke();
+  bg.font = 'bold 26px sans-serif'; bg.textAlign = 'center'; bg.textBaseline = 'middle';
+  bg.fillStyle = 'rgba(255,210,74,0.9)';
+  bg.fillText('C4', 64, 64);
+  const bt = new THREE.CanvasTexture(bc);
+  bombSiteMarker = new THREE.Mesh(
+    new THREE.PlaneGeometry(4,4),
+    new THREE.MeshBasicMaterial({map:bt, transparent:true, depthWrite:false})
+  );
+  bombSiteMarker.rotation.x = -Math.PI/2;
+  bombSiteMarker.position.set(BOMB_POINT[0], 0.05, BOMB_POINT[1]);
+  scene.add(bombSiteMarker);
 }
+let bombSiteMarker = null;
 buildMap('de_dust');
 
 // ---------- ray helpers ----------
@@ -1863,10 +1891,11 @@ function botShoot(b, target){
   const tx = target.x, ty = ty0, tz = target.z;
   const d = dist3(ox,oy,oz,tx,ty,tz);
   const moving = b.mode==='combat' && Math.abs(b.strafeT) > 0;
-  let hitChance = clamp(b.diff.acc - d*0.008 - (moving?0.12:0) - (b.crouch?0.05:0), 0.05, b.diff.acc);
+  // accuracy: close range = good, far = worse; movement penalizes a bit (CS-style)
+  let hitChance = clamp(b.diff.acc - d*0.006 - (moving?0.08:0) - (b.crouch?0.03:0), 0.06, b.diff.acc);
   if(smokeBetween(b.x,b.z,target.x,target.z)) hitChance *= 0.15;
   // realistic: first shots of a burst are less accurate (bot "warms up")
-  if(!b.burstT || b.burstT <= 0) hitChance *= 0.55;
+  if(!b.burstT || b.burstT <= 0) hitChance *= 0.7;
   const isHead = Math.random() < 0.12;
   // damage falloff with distance (realistic)
   const falloff = clamp(1 - d/180, 0.5, 1);
@@ -1876,7 +1905,7 @@ function botShoot(b, target){
   if(len < 0.01) return; // target at same point — no shot
   const ux = dx/len, uy = dy/len, uz = dz/len;
   // aim spread: bullets land near the target, not exactly on it
-  const spreadR = 0.35 * (1 - b.diff.acc) + 0.15; // meters of error
+  const spreadR = 0.28 * (1 - b.diff.acc) + 0.08; // meters of error
   const ex = ox + ux*len + rand(-spreadR,spreadR), ey = oy + uy*len + rand(-spreadR,spreadR), ez = oz + uz*len + rand(-spreadR,spreadR);
   addTracer(ox,oy,oz, ex,ey,ez, 0xffa060);
   const vol = clamp(1 - d/40, 0.15, 1);
@@ -2146,34 +2175,59 @@ function updateRadar(dt){
 
 // ---------- buy menu ----------
 const BUY_ITEMS = [
-  {id:'usp',    name:'USP-S',        desc:'Пистолет · 12 урона', price:0},
-  {id:'glock',  name:'Glock-18',      desc:'Пистолет · авто · 11 урона', price:400},
-  {id:'fiveseven', name:'Five-SeveN',desc:'Пистолет · 14 урона', price:750},
-  {id:'deagle', name:'Desert Eagle', desc:'Пистолет · 50 урона', price:700},
-  {id:'mp5',    name:'MP5-SD',       desc:'ПП · 25 урона', price:1500},
-  {id:'ump',    name:'UMP-45',       desc:'ПП · 30 урона', price:1700},
-  {id:'p90',    name:'P90',          desc:'ПП · 50 патронов · 22 урона', price:2350},
-  {id:'ak',     name:'AK-47',        desc:'Винтовка · 36 урона', price:2700},
-  {id:'m4',     name:'M4A1',         desc:'Винтовка CT · 33 урона', price:3100},
-  {id:'sg552',  name:'SG-552',       desc:'Винтовка T · 34 урона', price:3500},
-  {id:'aug',    name:'AUG',          desc:'Винтовка CT · 32 урона', price:3300},
-  {id:'scout',  name:'Scout',        desc:'Снайперка · 75 урона · зум', price:2750},
-  {id:'awp',    name:'AWP',          desc:'Снайперка · 115 урона · зум', price:4750},
-  {id:'m249',   name:'M249',         desc:'Пулемёт · 100 патронов', price:5200},
-  {id:'armor',  name:'Бронежилет',   desc:'Полная броня 100', price:650},
-  {id:'he',     name:'HE Граната',    desc:'Урон по площади', price:300},
-  {id:'smoke',  name:'Дымовая',       desc:'Дым · слепит ботов', price:300},
-  {id:'flash',  name:'Флешка',        desc:'Ослепляет врагов', price:200},
-  {id:'skin',   name:'Скин оружия',   desc:'Случайный цвет ствола', price:150}
+  {id:'usp',    name:'USP-S',        desc:'Пистолет · 12 урона', price:0, cat:'pistol'},
+  {id:'glock',  name:'Glock-18',      desc:'Пистолет · авто · 11 урона', price:400, cat:'pistol'},
+  {id:'fiveseven', name:'Five-SeveN',desc:'Пистолет · 14 урона', price:750, cat:'pistol'},
+  {id:'deagle', name:'Desert Eagle', desc:'Пистолет · 50 урона', price:700, cat:'pistol'},
+  {id:'mp5',    name:'MP5-SD',       desc:'ПП · 25 урона', price:1500, cat:'smg'},
+  {id:'ump',    name:'UMP-45',       desc:'ПП · 30 урона', price:1700, cat:'smg'},
+  {id:'p90',    name:'P90',          desc:'ПП · 50 патронов · 22 урона', price:2350, cat:'smg'},
+  {id:'ak',     name:'AK-47',        desc:'Винтовка · 36 урона', price:2700, cat:'rifle'},
+  {id:'m4',     name:'M4A1',         desc:'Винтовка CT · 33 урона', price:3100, cat:'rifle'},
+  {id:'sg552',  name:'SG-552',       desc:'Винтовка T · 34 урона', price:3500, cat:'rifle'},
+  {id:'aug',    name:'AUG',          desc:'Винтовка CT · 32 урона', price:3300, cat:'rifle'},
+  {id:'m249',   name:'M249',         desc:'Пулемёт · 100 патронов', price:5200, cat:'rifle'},
+  {id:'scout',  name:'Scout',        desc:'Снайперка · 75 урона · зум', price:2750, cat:'sniper'},
+  {id:'awp',    name:'AWP',          desc:'Снайперка · 115 урона · зум', price:4750, cat:'sniper'},
+  {id:'armor',  name:'Бронежилет',   desc:'Полная броня 100', price:650, cat:'gear'},
+  {id:'he',     name:'HE Граната',    desc:'Урон по площади', price:300, cat:'gear'},
+  {id:'smoke',  name:'Дымовая',       desc:'Дым · слепит ботов', price:300, cat:'gear'},
+  {id:'flash',  name:'Флешка',        desc:'Ослепляет врагов', price:200, cat:'gear'},
+  {id:'skin',   name:'Скин оружия',   desc:'Случайный цвет ствола', price:150, cat:'gear'}
 ];
+const BUY_CATS = [
+  {id:'pistol', label:'Пистолеты'},
+  {id:'smg',    label:'Пистолеты-пулемёты'},
+  {id:'rifle',  label:'Винтовки'},
+  {id:'sniper', label:'Снайперские'},
+  {id:'gear',   label:'Снаряжение'}
+];
+let buyCat = 'pistol';
 function buildBuyMenu(){
+  // category tabs
+  const tabs = $('bm-tabs');
+  tabs.innerHTML = '';
+  for(const c of BUY_CATS){
+    const b = document.createElement('button');
+    b.className = 'bm-tab' + (c.id===buyCat ? ' on' : '');
+    b.textContent = c.label;
+    b.dataset.cat = c.id;
+    b.addEventListener('click', ()=>{
+      buyCat = c.id;
+      buildBuyMenu();
+      refreshBuyMenu();
+    });
+    tabs.appendChild(b);
+  }
+  // items for current category
   const grid = $('bm-grid');
   grid.innerHTML = '';
   for(const it of BUY_ITEMS){
+    if(it.cat !== buyCat) continue;
     const div = document.createElement('div');
     div.className = 'bm-item';
     div.dataset.id = it.id;
-    div.innerHTML = `<div class="n">${it.name}</div><div class="d">${it.desc}</div><div class="p">$${it.price}</div>`;
+    div.innerHTML = `<div class="n">${WEAPON_ICON[it.id]||''} ${it.name}</div><div class="d">${it.desc}</div><div class="p">$${it.price}</div>`;
     grid.appendChild(div);
     div.addEventListener('click', ()=>buyItem(it.id));
   }
@@ -2339,6 +2393,7 @@ function startRound(){
     else carrier.hasBomb = true;
   }
   announce('РАУНД ' + roundNum, null, '#ffd24a', 1.5);
+  announce('ЗАМОРОЗКА — БЕЗ ДВИЖЕНИЯ', null, '#8ab8ff', 1.5);
   AudioSys.round();
 }
 function resetMatch(){
@@ -2575,8 +2630,8 @@ document.addEventListener('mousedown', e=>{
     spectateNext();
   }
   if(e.button === 2 && !player.dead && !$('buymenu').classList.contains('open')){
-    if(player.cur === 'awp') toggleZoom();
-    else switchWeapon('knife');
+    // RMB: zoom on snipers, nothing else (no auto-knife like CS)
+    if(player.cur === 'awp' || player.cur === 'scout') toggleZoom();
   }
 });
 document.addEventListener('mouseup', e=>{ if(e.button === 0) mouseDown = false; });
@@ -2809,6 +2864,8 @@ function updatePlayer(dt){
   if(keys['KeyS']) fwd -= 1;
   if(keys['KeyD']) strafe += 1;
   if(keys['KeyA']) strafe -= 1;
+  // FREEZE: can't move during freeze time (CS 1.6 style)
+  if(roundState === 'freeze'){ fwd = 0; strafe = 0; }
   const len = Math.hypot(fwd, strafe);
   // weapon-based speed: heavy guns slow you down (like CS)
   const spdMap = {knife:5.8, usp:5.5, glock:5.5, fiveseven:5.5, deagle:5.5, mp5:5.2, ump:5.2, p90:5.2, ak:5.0, m4:5.0, sg552:5.0, aug:5.0, scout:4.6, awp:4.2, m249:4.0, he:5.5, smoke:5.5, flash:5.5};
@@ -2898,7 +2955,7 @@ function updatePlayer(dt){
   } else {
     player.cookT = 0;
   }
-  if(mouseDown && player.fireT <= 0 && !player.reloading){
+  if(mouseDown && player.fireT <= 0 && !player.reloading && roundState !== 'freeze'){
     const cw = WEAPONS[player.cur];
     if(cw.auto || !player._firedThisClick){
       playerShoot();
@@ -3019,20 +3076,21 @@ function updateBot(b, dt){
     while(dAng < -Math.PI) dAng += Math.PI*2;
     b.yaw += dAng * Math.min(1, dt*8);
     const d = dist3(b.x,0,b.z, tx,0,tz);
-    // realistic: stop moving to shoot (like CS players)
+    // combat range: approach to ~10m, hold distance (no back-and-forth jitter)
     const wantShoot = d < 30 && Math.abs(dAng) < 0.5 && !b.reloading;
     if(wantShoot && b.burstCount > 0){
       // hold position while firing
       moveX = 0; moveZ = 0;
     } else if(d > 12){ moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw); }
-    else if(d < 6){ moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw); }
+    else if(d < 7){ moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw); }
+    else { moveX = 0; moveZ = 0; } // 7-12m: hold position, don't jitter
     // low HP: retreat to cover (back away)
     if(b.health < 30 && d < 20){
       moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw);
       b.strafeT = 0;
     }
     b.strafeT -= dt;
-    if(b.strafeT > 0 && !wantShoot){
+    if(b.strafeT > 0 && !wantShoot && d < 18){
       moveX += Math.cos(b.yaw) * b.strafeDir * 0.7;
       moveZ += -Math.sin(b.yaw) * b.strafeDir * 0.7;
     }
@@ -3131,13 +3189,13 @@ function updateBot(b, dt){
       moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
     }
   }
-  // unstick: if barely moved for 2s, random turn
+  // unstick: if barely moved for 3s, gentle turn (not a 180 flip)
   const movedNow = Math.abs(moveX)+Math.abs(moveZ);
   if(movedNow > 0.01){
     b.stuckT = (b.stuckT||0) + dt;
-    if(b.stuckT > 2){
+    if(b.stuckT > 3){
       b.stuckT = 0;
-      b.yaw += (Math.random()<0.5?1:-1) * 1.5;
+      b.yaw += (Math.random()<0.5?1:-1) * 0.8;
       moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
     }
   } else b.stuckT = 0;
