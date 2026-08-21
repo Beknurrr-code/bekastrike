@@ -135,7 +135,33 @@
   .diff-btn { padding:4px 12px; font-size:12px; background:rgba(255,255,255,.1); color:#cfd6dd; border:1px solid rgba(255,255,255,.2); border-radius:3px; cursor:pointer; }
   .diff-btn.on { background:#ffd24a; color:#111; border-color:#ffd24a; font-weight:700; }
 
-  /* Buy menu */
+  /* Inventory */
+  #invmenu { z-index:60; background:radial-gradient(ellipse at 50% 30%, rgba(30,40,60,.9), rgba(8,10,14,.97)); }
+  #invmenu .inv-wrap { max-width:760px; width:90%; max-height:86vh; background:linear-gradient(160deg, rgba(20,26,38,.95), rgba(10,14,22,.97)); border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:22px 26px; box-shadow:0 20px 60px rgba(0,0,0,.8); overflow-y:auto; }
+  #invmenu .inv-head { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  #invmenu .inv-title { font-size:24px; font-weight:800; letter-spacing:2px; color:#ffd24a; flex:1; }
+  #invmenu .inv-credits { color:#cfd6dd; font-size:15px; }
+  #invmenu .inv-credits b { color:#ffd24a; font-size:18px; }
+  #invmenu .inv-close { width:34px; height:34px; font-size:16px; background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.2); border-radius:50%; cursor:pointer; }
+  #invmenu .inv-close:hover { background:rgba(255,60,40,.4); }
+  #invmenu .inv-tabs { display:flex; gap:8px; margin-bottom:16px; }
+  #invmenu .inv-tab { padding:8px 18px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.15); border-radius:6px; cursor:pointer; }
+  #invmenu .inv-tab.on { background:#ffd24a; color:#111; border-color:#ffd24a; }
+  #invmenu .inv-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px; }
+  #invmenu .inv-item { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:12px; text-align:center; cursor:pointer; transition:transform .1s; }
+  #invmenu .inv-item:hover { transform:translateY(-2px); border-color:rgba(255,210,74,.5); }
+  #invmenu .inv-item .gun { font-size:28px; }
+  #invmenu .inv-item .sn { font-size:12px; color:#ffd24a; font-weight:600; margin-top:6px; }
+  #invmenu .inv-item .sw { font-size:11px; color:#8a96a4; margin-top:2px; }
+  #invmenu .inv-item .pr { font-size:13px; color:#fff; margin-top:6px; }
+  #invmenu .inv-item .pr.no { color:#ff5a4a; }
+  #invmenu .inv-item.owned { border-color:rgba(125,219,106,.5); }
+  #invmenu .inv-item.owned .own-tag { color:#7ddb6a; font-size:11px; font-weight:700; }
+  #invmenu .inv-hint { margin-top:14px; font-size:12px; color:#7d8b99; text-align:center; }
+  .credits-row { margin-top:10px; font-size:15px; color:#cfd6dd; }
+  .credits-row b { color:#ffd24a; font-size:18px; }
+  .inv-btn { margin-left:10px; padding:6px 14px; font-size:13px; font-weight:600; background:rgba(255,255,255,.1); color:#ffd24a; border:1px solid rgba(255,210,74,.4); border-radius:6px; cursor:pointer; }
+  .inv-btn:hover { background:rgba(255,210,74,.2); }
   #buymenu { position:fixed; inset:0; z-index:40; background:rgba(5,7,10,.92); display:none; }
   #buymenu .bm-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
   #buymenu .bm-tab { pointer-events:auto; padding:6px 14px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:4px; cursor:pointer; }
@@ -346,6 +372,7 @@
     <div class="logo-row">💣 BekaStrike</div>
     <div class="title">BEKASTRIKE<span class="v2">CS2</span></div>
     <div class="subtitle">FPS в стиле Counter-Strike 2</div>
+    <div class="credits-row">🪙 Кредиты: <b id="menu-credits">0</b> <button class="inv-btn" id="inv-btn">🎒 Инвентарь</button></div>
     <button class="btn" id="play-btn">▶ ИГРАТЬ</button>
     <button class="btn gray" id="mp-btn" style="margin-top:10px">🌐 МУЛЬТИПЛЕЕР</button>
     <div class="team-switch" style="margin-top:12px">
@@ -383,6 +410,23 @@
       <span><b>M</b></span><span>звук вкл/выкл</span>
     </div>
     <div class="hintline">Команда CT против террористов. До 16 раундов. Удачи, Beknur!</div>
+  </div>
+</div>
+
+<!-- Inventory (CS2-style skins shop) -->
+<div id="invmenu" class="overlay hidden">
+  <div class="inv-wrap">
+    <div class="inv-head">
+      <span class="inv-title">🎒 ИНВЕНТАРЬ</span>
+      <span class="inv-credits">🪙 <b id="inv-credits">0</b></span>
+      <button class="inv-close" id="inv-close">✕</button>
+    </div>
+    <div class="inv-tabs">
+      <button class="inv-tab on" data-tab="owned">Мои скины</button>
+      <button class="inv-tab" data-tab="shop">Магазин скинов</button>
+    </div>
+    <div class="inv-grid" id="inv-grid"></div>
+    <div class="inv-hint">Скины применяются к оружию в игре. Кредиты за убийства (+5) и победы (+25).</div>
   </div>
 </div>
 
@@ -1052,6 +1096,7 @@ const player = {
   team:'CT', name:'Beknur', x:CT_SPAWNS[0][0], z:CT_SPAWNS[0][1], y:0,
   vy:0, onGround:true, crouch:0, eyeH:1.7, radius:0.4,
   yaw:0, pitch:0, health:100, armor:100, money:800,
+  credits: +(localStorage.getItem('bekastrike_credits')||0), // CS2-style persistent credits
   dead:false, respawnT:0, kills:0, deaths:0, streak:0, spawnProtect:0,
   weapons:{usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0},
   cur:'usp',
@@ -1695,6 +1740,7 @@ function killEntity(e, attacker, weaponName, weaponKind, part){
     attacker.streak = (attacker.streak||0) + 1;
     if(attacker === player){
       player.money += 300;
+      player.credits = (player.credits||0) + 5; // CS2-style credits for kills
       AudioSys.kill();
       hitMarker(true);
     }
@@ -2729,6 +2775,10 @@ function showVictory(){
   $('victory').classList.add('show');
   document.exitPointerLock();
   if(win) AudioSys.victory(); else AudioSys.defeat();
+  // CS2 credits: +25 for win, +10 for loss
+  player.credits = (player.credits||0) + (win ? 25 : 10);
+  localStorage.setItem('bekastrike_credits', player.credits);
+  refreshMenuCredits();
 }
 function resetMatch(){
   matchOver = false; matchWinner = null;
@@ -2977,6 +3027,100 @@ function startReload(){
   AudioSys.reload();
 }
 
+// ---------- inventory (CS2-style) ----------
+const SKINS = [
+  {id:'redline',     name:'AK-47 | Redline',        gun:'AK-47',   color:0xc82020, price:40},
+  {id:'asiimov',     name:'AWP | Asiimov',          gun:'AWP',      color:0xf5a623, price:60},
+  {id:'howl',        name:'M4A4 | Howl',            gun:'M4A1',     color:0xe0402a, price:50},
+  {id:'fireserpent', name:'AK-47 | Fire Serpent',   gun:'AK-47',    color:0xd04030, price:55},
+  {id:'dragonlore',  name:'AWP | Dragon Lore',      gun:'AWP',      color:0xb8860b, price:80},
+  {id:'fade',        name:'Glock | Fade',           gun:'Glock',    color:0xe040a0, price:25},
+  {id:'killconfirm', name:'USP-S | Kill Confirmed', gun:'USP-S',    color:0x20c8c8, price:20},
+  {id:'hyperbeast',  name:'M4A1 | Hyper Beast',     gun:'M4A1',     color:0x30a0e0, price:45},
+  {id:'neonrider',   name:'P90 | Neon Rider',       gun:'P90',      color:0x20c0e0, price:30},
+  {id:'bloodsport',  name:'AUG | Bengal Tiger',     gun:'AUG',      color:0xe8a020, price:35}
+];
+function ownedSkins(){
+  try{ return JSON.parse(localStorage.getItem('bekastrike_skins')||'[]'); }
+  catch(e){ return []; }
+}
+function saveOwned(list){
+  localStorage.setItem('bekastrike_skins', JSON.stringify(list));
+}
+function refreshMenuCredits(){
+  const el = $('menu-credits');
+  if(el) el.textContent = player.credits;
+}
+let invTab = 'owned';
+function buildInventory(){
+  refreshMenuCredits();
+  $('inv-credits').textContent = player.credits;
+  const owned = ownedSkins();
+  const grid = $('inv-grid');
+  grid.innerHTML = '';
+  const show = invTab === 'owned'
+    ? SKINS.filter(s=>owned.includes(s.id))
+    : SKINS;
+  if(show.length === 0){
+    grid.innerHTML = '<div class="inv-hint" style="grid-column:1/-1;padding:30px 0">Пока пусто — купи скин в «Магазин скинов»!</div>';
+    return;
+  }
+  for(const s of show){
+    const isOwned = owned.includes(s.id);
+    const div = document.createElement('div');
+    div.className = 'inv-item' + (isOwned ? ' owned' : '');
+    div.innerHTML = `
+      <div class="gun">🔫</div>
+      <div class="sn">${s.name}</div>
+      <div class="sw">${s.gun}</div>
+      ${isOwned ? '<div class="own-tag">✔ Владеешь</div>' : `<div class="pr">🪙 ${s.price}</div>`}
+    `;
+    div.addEventListener('click', ()=>{
+      if(isOwned){
+        // apply this skin
+        player.skinColor = s.color;
+        player.skinName = s.name;
+        announce('🎨 ' + s.name + ' — НАДЕТ!', null, '#ffd24a', 1.5);
+        buildViewmodel(player.cur);
+        AudioSys.buy();
+      } else if(player.credits >= s.price){
+        player.credits -= s.price;
+        localStorage.setItem('bekastrike_credits', player.credits);
+        owned.push(s.id);
+        saveOwned(owned);
+        announce('🎨 Куплен: ' + s.name, null, '#7ddb6a', 1.5);
+        AudioSys.buy();
+        buildInventory();
+      } else {
+        AudioSys.deny();
+        announce('НЕ ХВАТАЕТ КРЕДИТОВ!', null, '#ff5a4a', 1.2);
+      }
+    });
+    grid.appendChild(div);
+  }
+}
+function initInventoryUI(){
+  const invBtn = $('inv-btn');
+  const close = $('inv-close');
+  const menu = $('invmenu');
+  invBtn.addEventListener('click', ()=>{
+    refreshMenuCredits();
+    invTab = 'owned';
+    document.querySelectorAll('.inv-tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='owned'));
+    buildInventory();
+    menu.classList.remove('hidden');
+  });
+  close.addEventListener('click', ()=>menu.classList.add('hidden'));
+  document.querySelectorAll('.inv-tab').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      invTab = t.dataset.tab;
+      document.querySelectorAll('.inv-tab').forEach(x=>x.classList.toggle('on', x===t));
+      buildInventory();
+    });
+  });
+  refreshMenuCredits();
+}
+
 // ---------- settings UI ----------
 function buildSettingsUI(root){
   const sens = root.querySelector('.set-sens');
@@ -3011,6 +3155,7 @@ function buildSettingsUI(root){
 }
 buildSettingsUI($('menu-settings'));
 buildSettingsUI($('pause-settings'));
+initInventoryUI();
 
 // ---------- player update ----------
 var switchT = 0;
