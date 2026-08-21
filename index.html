@@ -907,6 +907,30 @@ function buildMap(name){
     scene.add(sign);
     bombSiteMarkers.push(sign);
   });
+  // spawn zone markers: CT (blue) and T (red)
+  const spawnMark = (pts, label, color) => {
+    const sc2 = document.createElement('canvas'); sc2.width = 128; sc2.height = 64;
+    const sg2 = sc2.getContext('2d');
+    sg2.fillStyle = 'rgba(0,0,0,0.55)';
+    sg2.fillRect(0,0,128,64);
+    sg2.strokeStyle = color; sg2.lineWidth = 5;
+    sg2.strokeRect(3,3,122,58);
+    sg2.font = 'bold 34px sans-serif'; sg2.textAlign = 'center'; sg2.textBaseline = 'middle';
+    sg2.fillStyle = color;
+    sg2.fillText(label, 64, 34);
+    const st2 = new THREE.CanvasTexture(sc2);
+    for(const [sx, sz] of pts){
+      const sign = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.2,1.1),
+        new THREE.MeshBasicMaterial({map:st2, transparent:true, side:THREE.DoubleSide})
+      );
+      sign.position.set(sx, 0.4, sz);
+      scene.add(sign);
+      bombSiteMarkers.push(sign);
+    }
+  };
+  spawnMark(CT_SPAWNS, 'CT', '#4a9ae8');
+  spawnMark(T_SPAWNS, 'T', '#e84a4a');
 }
 let bombSiteMarkers = [];
 buildMap('de_dust');
@@ -1219,7 +1243,10 @@ function respawnBot(b){
 // ---------- hostages (cs_assault) ----------
 let hostages = []; // {x,z,group,follow,leader,rescued,dead,walkT}
 const HOSTAGE_POINTS = [[-20,-20],[-15,-20],[-20,-15]]; // where they stand
-const HOSTAGE_RESCUE = [30,-30]; // rescue zone (CT spawn area)
+function rescueZone(){
+  // CT spawn area = rescue zone
+  return CT_SPAWNS.length ? CT_SPAWNS[0] : [30,-30];
+}
 function buildHostage(x, z){
   const g = new THREE.Group();
   const skin = new THREE.MeshLambertMaterial({color:0xd8a878});
@@ -1247,8 +1274,10 @@ function buildHostage(x, z){
 function resetHostages(){
   for(const h of hostages){ scene.remove(h.group); }
   hostages = [];
-  const pts = MAPS[currentMap].hostagePoints;
-  if(!pts) return; // no hostages on bomb maps (de_*) — only cs_office
+  if(!MAPS[currentMap].hostagePoints) return; // no hostages on bomb maps (de_*) — only cs_office
+  // hostages spawn near T spawn (like CS: they're held by T)
+  const t0 = T_SPAWNS.length ? T_SPAWNS[0] : [30,30];
+  const pts = [[t0[0]+4, t0[1]+4], [t0[0]+6, t0[1]+3], [t0[0]+4, t0[1]+6]];
   for(const p of pts) buildHostage(p[0], p[1]);
 }
 function updateHostages(dt){
@@ -1277,9 +1306,11 @@ function updateHostages(dt){
       const s = Math.sin(h.walkT*Math.PI*2)*0.1;
       h.group.children[0].position.x = s*0.5;
       h.group.children[1].position.x = -s*0.5;
-      // rescue check
-      const dR = dist3(h.x,0,h.z, HOSTAGE_RESCUE[0],0,HOSTAGE_RESCUE[1]);
-      if(dR < 3){
+    }
+    // rescued once the hostage itself enters the CT spawn zone
+    const rz = rescueZone();
+    const dR = dist3(h.x,0,h.z, rz[0],0,rz[1]);
+    if(dR < 4){
         h.rescued = true;
         h.group.visible = false;
         announce('ЗАЛОЖНИК СПАСЁН!', null, '#7ddb6a', 1.5);
@@ -1290,11 +1321,6 @@ function updateHostages(dt){
         if(roundState === 'live' && hostages.every(x=>x.rescued || x.dead)){
           endRound('CT', 'ВСЕ ЗАЛОЖНИКИ СПАСЕНЫ');
         }
-      }
-    } else {
-      h.walkT = 0;
-      h.group.children[0].position.x = 0;
-      h.group.children[1].position.x = 0;
     }
     h.group.position.set(h.x, 0, h.z);
   }
@@ -3249,13 +3275,14 @@ function updateBot(b, dt){
       bomb.defuseT = DEFUSE_T;
     }
   }
-  // CT bots: escort nearby hostage to rescue zone
+  // CT bots: escort nearby hostage to rescue zone (CT spawn)
   if(b.team === 'CT' && roundState === 'live' && !blinded){
     const near = hostages.find(h=>!h.dead && !h.rescued && dist3(b.x,0,b.z, h.x,0,h.z) < 4);
     if(near){
-      const dR = dist3(b.x,0,b.z, HOSTAGE_RESCUE[0],0,HOSTAGE_RESCUE[1]);
+      const rz = rescueZone();
+      const dR = dist3(b.x,0,b.z, rz[0],0,rz[1]);
       if(dR > 3){
-        const ang = Math.atan2(HOSTAGE_RESCUE[0]-b.x, HOSTAGE_RESCUE[1]-b.z);
+        const ang = Math.atan2(rz[0]-b.x, rz[1]-b.z);
         b.yaw += (ang - b.yaw) * Math.min(1, dt*3);
         moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
       }
