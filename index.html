@@ -1788,7 +1788,9 @@ function playerShoot(){
   }
 
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-  const spreadA = w.spread + spread;
+  // standing still + first shot = perfect accuracy (CS-style)
+  const precise = spread < 0.001 && !player.moving;
+  const spreadA = precise ? 0.0005 : w.spread + spread;
   dir.x += rand(-spreadA, spreadA); dir.y += rand(-spreadA, spreadA); dir.z += rand(-spreadA, spreadA);
   dir.normalize();
   const ox = player.x, oy = player.y + player.eyeH, oz = player.z;
@@ -1878,22 +1880,25 @@ function addTracer(x1,y1,z1,x2,y2,z2,color){
   const geo = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(x1,y1,z1), new THREE.Vector3(x2,y2,z2)
   ]);
-  // bright core
-  const core = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:0.95, blending:THREE.AdditiveBlending}));
-  // glow halo (wider, colored)
-  const glow = new THREE.Line(geo, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.45, blending:THREE.AdditiveBlending}));
-  glow.scale.set(1,1,1);
-  scene.add(core); scene.add(glow);
-  tracers.push({line:core, glow, life:0.1, max:0.1});
+  // super-visible tracer: bright white core + colored glow + outer halo
+  const core = new THREE.Line(geo, new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:1, blending:THREE.AdditiveBlending}));
+  core.scale.set(1.6,1.6,1);
+  const glow = new THREE.Line(geo, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.75, blending:THREE.AdditiveBlending}));
+  glow.scale.set(2.6,2.6,1);
+  const halo = new THREE.Line(geo, new THREE.LineBasicMaterial({color, transparent:true, opacity:0.3, blending:THREE.AdditiveBlending}));
+  halo.scale.set(4,4,1);
+  scene.add(core); scene.add(glow); scene.add(halo);
+  tracers.push({line:core, glow, halo, life:0.16, max:0.16});
 }
 function updateTracers(dt){
   for(const t of tracers){
     t.life -= dt;
     const a = clamp(t.life/t.max, 0, 1);
     t.line.material.opacity = a;
-    if(t.glow) t.glow.material.opacity = a*0.45;
+    if(t.glow) t.glow.material.opacity = a*0.75;
+    if(t.halo) t.halo.material.opacity = a*0.3;
   }
-  for(const t of tracers) if(t.life <= 0){ scene.remove(t.line); if(t.glow) scene.remove(t.glow); }
+  for(const t of tracers) if(t.life <= 0){ scene.remove(t.line); if(t.glow) scene.remove(t.glow); if(t.halo) scene.remove(t.halo); }
   tracers.splice(0, tracers.length, ...tracers.filter(t=>t.life>0));
 }
 
@@ -2958,7 +2963,9 @@ function updatePlayer(dt){
     player.walkT += dt * (walking ? 5 : 10);
     if(player.walkT > 1){ player.walkT = 0; AudioSys.footstep(); }
   }
-  spread = Math.max(0, spread - dt*0.12);
+  // spread decays fast when standing still (CS-style: stop = accurate)
+  const standing = !player.moving;
+  spread = Math.max(0, spread - dt * (standing ? 0.6 : 0.12));
   if(player.reloading){
     player.reloadT -= dt;
     if(player.reloadT <= 0){
@@ -3070,7 +3077,7 @@ function updateBot(b, dt){
       b.aimT = b.diff.react; // reaction delay before first shot
       b.strafeT = rand(0.5, 1.5);
       b.strafeDir = Math.random()<0.5?-1:1;
-      b.crouch = (bestD < 15 && Math.random() < 0.3) ? 1 : 0;
+      b.crouch = 0; // no crouch-jitter in combat (head stays up)
     } else {
       // lost target: reset burst, reposition
       b.burstCount = 0;
