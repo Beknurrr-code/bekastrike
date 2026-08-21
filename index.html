@@ -609,12 +609,13 @@ ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
 // ---------- maps ----------
 let currentMap = 'de_dust';
 let CT_SPAWNS = [], T_SPAWNS = [];
-let BOMB_POINT = [20, 20]; // plant site (updated by buildMap)
+let BOMB_SITES = [[20,20],[20,-20]]; // plant sites A/B (updated by buildMap)
+let BOMB_POINT = BOMB_SITES[0]; // nearest site for bots (legacy refs)
 const MAPS = {
   de_dust: {
     name:'de_dust',
     label:'Dust (пустыня)',
-    bombPoint:[20,20],
+    bombSites:[[-22,-22],[22,-22]], // A (left) and B (right) like real de_dust
     hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
@@ -625,37 +626,42 @@ const MAPS = {
       addBox(0,  MAP/2+W/2, MAP+W*2, W, H, 0x9a8a6a, wallTex);
       addBox(-MAP/2-W/2, 0, W, MAP, H, 0x9a8a6a, wallTex);
       addBox( MAP/2+W/2, 0, W, MAP, H, 0x9a8a6a, wallTex);
-      // central structure (like dust mid)
-      addBox(0, 0, 10, 6, 4, 0x8a7a5a, wallTex);
-      addBox(-8, 0, 4, 4, 3, 0x8a7a5a, wallTex);
-      addBox(8, 0, 4, 4, 3, 0x8a7a5a, wallTex);
-      // crates (jumpable platforms h<=2)
-      addBox(-14, -10, 3, 3, 2, 0xffffff, crateTex);
-      addBox(-10, -12, 3, 3, 2, 0xffffff, crateTex);
-      addBox(14, -10, 3, 3, 2, 0xffffff, crateTex);
-      addBox(10, -12, 3, 3, 2, 0xffffff, crateTex);
-      addBox(-20, 5, 4, 4, 2.5, 0xffffff, crateTex);
-      addBox(20, 5, 4, 4, 2.5, 0xffffff, crateTex);
-      addBox(-5, 18, 3, 3, 1.5, 0xffffff, crateTex);
-      addBox(5, 18, 3, 3, 1.5, 0xffffff, crateTex);
-      addBox(-25, -20, 5, 5, 3, 0xffffff, crateTex);
-      addBox(25, -20, 5, 5, 3, 0xffffff, crateTex);
-      addBox(-30, 0, 3, 3, 2, 0xffffff, crateTex);
-      addBox(30, 0, 3, 3, 2, 0xffffff, crateTex);
-      addBox(0, -25, 8, 3, 2.5, 0x8a7a5a, wallTex);
-      addBox(0, 25, 8, 3, 2.5, 0x8a7a5a, wallTex);
-      // jump platforms
+      // mid: central double doors (like dust mid)
+      addBox(0, 0, 10, 5, 4, 0x8a7a5a, wallTex);
+      addBox(-8, 0, 3, 3, 3, 0x8a7a5a, wallTex);
+      addBox(8, 0, 3, 3, 3, 0x8a7a5a, wallTex);
+      // long A: corridor to site A (left)
+      addBox(-25, -12, 2, 14, 3.5, 0x9a8a6a, wallTex);
+      addBox(-19, -12, 2, 14, 3.5, 0x9a8a6a, wallTex);
+      // site A: open plaza with crates
+      addBox(-22, -22, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-25, -18, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-19, -25, 3, 3, 2, 0xffffff, crateTex);
+      // long B: corridor to site B (right)
+      addBox(19, -12, 2, 25, 3.5, 0x9a8a6a, wallTex);
+      addBox(25, -12, 2, 25, 3.5, 0x9a8a6a, wallTex);
+      // site B: open plaza with crates
+      addBox(22, -22, 3, 3, 2, 0xffffff, crateTex);
+      addBox(25, -18, 3, 3, 2, 0xffffff, crateTex);
+      addBox(19, -25, 3, 3, 2, 0xffffff, crateTex);
+      // mid crates (jumpable)
+      addBox(-14, -6, 3, 3, 2, 0xffffff, crateTex);
+      addBox(14, -6, 3, 3, 2, 0xffffff, crateTex);
+      addBox(0, -6, 4, 4, 2, 0xffffff, crateTex);
+      addBox(-6, 6, 3, 3, 1.5, 0xffffff, crateTex);
+      addBox(6, 6, 3, 3, 1.5, 0xffffff, crateTex);
+      // upper area (T side): crates and cover
+      addBox(-20, 20, 4, 4, 2.5, 0xffffff, crateTex);
+      addBox(20, 20, 4, 4, 2.5, 0xffffff, crateTex);
+      addBox(-30, 5, 3, 3, 2, 0xffffff, crateTex);
+      addBox(30, 5, 3, 3, 2, 0xffffff, crateTex);
+      // tunnels flanking mid
+      addBox(-12, 0, 2, 10, 3, 0x9a8a6a, wallTex);
+      addBox(12, 0, 2, 10, 3, 0x9a8a6a, wallTex);
+      // jump platforms around mid
       addBox(-6, -14, 3, 3, 2, 0xffffff, crateTex);
       addBox(6, -14, 3, 3, 2, 0xffffff, crateTex);
-      addBox(-6, 14, 3, 3, 2, 0xffffff, crateTex);
-      addBox(6, 14, 3, 3, 2, 0xffffff, crateTex);
-      addBox(0, -6, 4, 4, 2, 0xffffff, crateTex);
-      // long walls for lanes
-      addBox(-18, -30, 2, 16, 3.5, 0x9a8a6a, wallTex);
-      addBox(18, -30, 2, 16, 3.5, 0x9a8a6a, wallTex);
-      addBox(-18, 30, 2, 16, 3.5, 0x9a8a6a, wallTex);
-      addBox(18, 30, 2, 16, 3.5, 0x9a8a6a, wallTex);
-      // pillars
+      // pillars (corners)
       addBox(-35, -35, 2, 2, 5, 0x9a8a6a, wallTex);
       addBox(35, -35, 2, 2, 5, 0x9a8a6a, wallTex);
       addBox(-35, 35, 2, 2, 5, 0x9a8a6a, wallTex);
@@ -665,7 +671,7 @@ const MAPS = {
   de_nuke: {
     name:'de_nuke',
     label:'Nuke (склад)',
-    bombPoint:[0,20],
+    bombSites:[[-24,18],[24,18]], // A (left) and B (right) — nuke style
     hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
@@ -712,7 +718,7 @@ const MAPS = {
   de_inferno: {
     name:'de_inferno',
     label:'Inferno (город)',
-    bombPoint:[-20,20],
+    bombSites:[[-24,-18],[-24,18]], // A and B in the houses — like real inferno
     hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
@@ -722,29 +728,31 @@ const MAPS = {
       addBox(0,  MAP/2+W/2, MAP+W*2, W, H, 0x8a7a6a, wallTex);
       addBox(-MAP/2-W/2, 0, W, MAP, H, 0x8a7a6a, wallTex);
       addBox( MAP/2+W/2, 0, W, MAP, H, 0x8a7a6a, wallTex);
-      // houses (inferno style)
-      addBox(-20, -10, 8, 8, 4, 0x9a6a4a, wallTex);
-      addBox(-20, 10, 8, 8, 4, 0x9a6a4a, wallTex);
-      addBox(20, -10, 8, 8, 4, 0x9a6a4a, wallTex);
-      addBox(20, 10, 8, 8, 4, 0x9a6a4a, wallTex);
-      // central plaza
+      // houses with courtyards (inferno style): A-house (left-top), B-house (left-bottom)
+      addBox(-18, 16, 10, 10, 4, 0x9a6a4a, wallTex);
+      addBox(-18, -16, 10, 10, 4, 0x9a6a4a, wallTex);
+      // T-side house (right)
+      addBox(20, 20, 10, 10, 4, 0x9a6a4a, wallTex);
+      // banana: long curve alley on the right (like inferno)
+      addBox(14, -18, 2, 14, 3.5, 0x8a7a6a, wallTex);
+      addBox(22, -6, 14, 2, 3.5, 0x8a7a6a, wallTex);
+      addBox(26, 8, 2, 12, 3.5, 0x8a7a6a, wallTex);
+      // mid: plaza with fountain-style boxes
       addBox(0, 0, 6, 6, 3, 0x8a7a5a, wallTex);
       addBox(-8, 0, 3, 3, 2, 0xffffff, crateTex);
       addBox(8, 0, 3, 3, 2, 0xffffff, crateTex);
-      // alleys
+      // alleys (upper and lower)
       addBox(-30, -20, 2, 12, 3.5, 0x8a7a6a, wallTex);
       addBox(30, -20, 2, 12, 3.5, 0x8a7a6a, wallTex);
       addBox(-30, 20, 2, 12, 3.5, 0x8a7a6a, wallTex);
       addBox(30, 20, 2, 12, 3.5, 0x8a7a6a, wallTex);
-      // crates
-      addBox(-14, -10, 3, 3, 2, 0xffffff, crateTex);
-      addBox(14, -10, 3, 3, 2, 0xffffff, crateTex);
-      addBox(-14, 10, 3, 3, 2, 0xffffff, crateTex);
-      addBox(14, 10, 3, 3, 2, 0xffffff, crateTex);
+      // crates around sites
+      addBox(-22, -22, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-14, -22, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-22, 22, 3, 3, 2, 0xffffff, crateTex);
+      addBox(-14, 22, 3, 3, 2, 0xffffff, crateTex);
       addBox(-5, 18, 3, 3, 1.5, 0xffffff, crateTex);
       addBox(5, 18, 3, 3, 1.5, 0xffffff, crateTex);
-      addBox(-25, -20, 5, 5, 3, 0xffffff, crateTex);
-      addBox(25, -20, 5, 5, 3, 0xffffff, crateTex);
       // jump platforms
       addBox(-6, -14, 3, 3, 2, 0xffffff, crateTex);
       addBox(6, -14, 3, 3, 2, 0xffffff, crateTex);
@@ -761,7 +769,7 @@ const MAPS = {
   de_train: {
     name:'de_train',
     label:'Train (депо)',
-    bombPoint:[0,-20],
+    bombSites:[[-24,-22],[24,-22]], // A (left) and B (right) on the platforms
     hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
@@ -802,7 +810,7 @@ const MAPS = {
   cs_office: {
     name:'cs_office',
     label:'Office (офис)',
-    bombPoint:[20,-20],
+    bombSites:[[-24,-18],[24,-18]], // A and B in the offices
     hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
@@ -849,38 +857,44 @@ function buildMap(name){
   // clear old map
   for(const c of colliders) scene.remove(c.mesh);
   colliders.length = 0;
-  if(bombSiteMarker) scene.remove(bombSiteMarker);
+  for(const mk of bombSiteMarkers) scene.remove(mk);
+  bombSiteMarkers.length = 0;
   const m = MAPS[name] || MAPS.de_dust;
   currentMap = name;
   m.build();
-  // update bomb point and spawns
-  BOMB_POINT[0] = m.bombPoint[0]; BOMB_POINT[1] = m.bombPoint[1];
+  // update bomb sites and spawns
+  BOMB_SITES.length = 0;
+  for(const s of (m.bombSites || [[20,20],[20,-20]])) BOMB_SITES.push(s);
+  BOMB_POINT[0] = BOMB_SITES[0][0]; BOMB_POINT[1] = BOMB_SITES[0][1];
   CT_SPAWNS.length = 0; T_SPAWNS.length = 0;
   for(const s of m.ctSpawns) CT_SPAWNS.push(s);
   for(const s of m.tSpawns) T_SPAWNS.push(s);
-  // bomb site marker (yellow circle on the ground)
-  const bc = document.createElement('canvas'); bc.width = bc.height = 128;
-  const bg = bc.getContext('2d');
-  const gr = bg.createRadialGradient(64,64,8,64,64,60);
-  gr.addColorStop(0,'rgba(255,210,74,0.55)');
-  gr.addColorStop(0.7,'rgba(255,210,74,0.2)');
-  gr.addColorStop(1,'rgba(255,210,74,0)');
-  bg.fillStyle = gr; bg.fillRect(0,0,128,128);
-  bg.strokeStyle = 'rgba(255,210,74,0.8)'; bg.lineWidth = 4;
-  bg.beginPath(); bg.arc(64,64,50,0,7); bg.stroke();
-  bg.font = 'bold 26px sans-serif'; bg.textAlign = 'center'; bg.textBaseline = 'middle';
-  bg.fillStyle = 'rgba(255,210,74,0.9)';
-  bg.fillText('C4', 64, 64);
-  const bt = new THREE.CanvasTexture(bc);
-  bombSiteMarker = new THREE.Mesh(
-    new THREE.PlaneGeometry(4,4),
-    new THREE.MeshBasicMaterial({map:bt, transparent:true, depthWrite:false})
-  );
-  bombSiteMarker.rotation.x = -Math.PI/2;
-  bombSiteMarker.position.set(BOMB_POINT[0], 0.05, BOMB_POINT[1]);
-  scene.add(bombSiteMarker);
+  // bomb site markers (A and B, yellow circles on the ground)
+  BOMB_SITES.forEach((site, i) => {
+    const bc = document.createElement('canvas'); bc.width = bc.height = 128;
+    const bg = bc.getContext('2d');
+    const gr = bg.createRadialGradient(64,64,8,64,64,60);
+    gr.addColorStop(0,'rgba(255,210,74,0.55)');
+    gr.addColorStop(0.7,'rgba(255,210,74,0.2)');
+    gr.addColorStop(1,'rgba(255,210,74,0)');
+    bg.fillStyle = gr; bg.fillRect(0,0,128,128);
+    bg.strokeStyle = 'rgba(255,210,74,0.8)'; bg.lineWidth = 4;
+    bg.beginPath(); bg.arc(64,64,50,0,7); bg.stroke();
+    bg.font = 'bold 30px sans-serif'; bg.textAlign = 'center'; bg.textBaseline = 'middle';
+    bg.fillStyle = 'rgba(255,210,74,0.9)';
+    bg.fillText(i===0 ? 'A' : 'B', 64, 64);
+    const bt = new THREE.CanvasTexture(bc);
+    const mk = new THREE.Mesh(
+      new THREE.PlaneGeometry(4,4),
+      new THREE.MeshBasicMaterial({map:bt, transparent:true, depthWrite:false})
+    );
+    mk.rotation.x = -Math.PI/2;
+    mk.position.set(site[0], 0.05, site[1]);
+    scene.add(mk);
+    bombSiteMarkers.push(mk);
+  });
 }
-let bombSiteMarker = null;
+let bombSiteMarkers = [];
 buildMap('de_dust');
 
 // ---------- ray helpers ----------
@@ -2486,10 +2500,15 @@ function bombExplode(){
 function plantBomb(){
   if(!player.hasBomb || player.dead) return;
   if(roundState !== 'live') return;
-  const d = dist3(player.x, 0, player.z, BOMB_POINT[0], 0, BOMB_POINT[1]);
-  if(d > 3){ announce('ПОДОЙДИ К ТОЧКЕ БОМБЫ', null, '#ff5a4a', 1.2); return; }
+  // nearest bomb site (A or B)
+  let site = BOMB_SITES[0], bestD = 1e9;
+  for(const s of BOMB_SITES){
+    const d = dist3(player.x, 0, player.z, s[0], 0, s[1]);
+    if(d < bestD){ bestD = d; site = s; }
+  }
+  if(bestD > 3){ announce('ПОДОЙДИ К САЙТУ БОМБЫ (A/B)', null, '#ff5a4a', 1.2); return; }
   player.hasBomb = false;
-  bomb = {x:BOMB_POINT[0], z:BOMB_POINT[1], planted:true, plantT:BOMB_FUSE, defuseT:0, defusing:false, mesh:makeBombMesh()};
+  bomb = {x:site[0], z:site[1], planted:true, plantT:BOMB_FUSE, defuseT:0, defusing:false, mesh:makeBombMesh()};
   bomb.mesh.position.set(bomb.x, 0.1, bomb.z);
   scene.add(bomb.mesh);
   announce('БОМБА УСТАНОВЛЕНА!', null, '#ff5a4a', 2);
@@ -3107,17 +3126,21 @@ function updateBot(b, dt){
     b.yaw += (ang - b.yaw) * Math.min(1, dt*3);
     moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
   }
-  // bomb carrier: go to bomb point and plant (priority over combat)
+  // bomb carrier: go to nearest bomb site and plant (priority over combat)
   if(b.hasBomb && roundState === 'live' && !blinded){
-    const dToPoint = dist3(b.x,0,b.z, BOMB_POINT[0],0,BOMB_POINT[1]);
-    if(dToPoint > 2.5){
-      const ang = Math.atan2(BOMB_POINT[0]-b.x, BOMB_POINT[1]-b.z);
+    let site = BOMB_SITES[0], bestD = 1e9;
+    for(const s of BOMB_SITES){
+      const d = dist3(b.x,0,b.z, s[0],0,s[1]);
+      if(d < bestD){ bestD = d; site = s; }
+    }
+    if(bestD > 2.5){
+      const ang = Math.atan2(site[0]-b.x, site[1]-b.z);
       b.yaw += (ang - b.yaw) * Math.min(1, dt*4);
       moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw);
       b.mode = 'patrol'; // don't fight while carrying
     } else if(!bomb || !bomb.planted){
       // plant!
-      bomb = {x:BOMB_POINT[0], z:BOMB_POINT[1], planted:true, plantT:BOMB_FUSE, defuseT:0, defusing:false, mesh:makeBombMesh()};
+      bomb = {x:site[0], z:site[1], planted:true, plantT:BOMB_FUSE, defuseT:0, defusing:false, mesh:makeBombMesh()};
       bomb.mesh.position.set(bomb.x, 0.1, bomb.z);
       scene.add(bomb.mesh);
       b.hasBomb = false;
