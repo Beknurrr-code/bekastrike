@@ -184,6 +184,25 @@
   .playmode { margin-top:16px; }
   .pm-title { color:#ffd24a; font-size:14px; letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; }
   .hidden { display:none !important; }
+  .lb-modes { display:flex; gap:8px; margin-bottom:8px; }
+  .lb-mode { padding:8px 18px; font-size:14px; font-weight:700; color:#cfd6dd; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.15); border-radius:6px; cursor:pointer; }
+  .lb-mode.on { background:#ffd24a; color:#111; border-color:#ffd24a; }
+  .lb-mode-hint { font-size:12px; color:#9fb0c0; }
+  .lb-serv-empty { font-size:12px; color:#8a96a4; background:rgba(255,255,255,.03); border:1px dashed rgba(255,255,255,.1); border-radius:6px; padding:10px; }
+  #lb-quick { width:100%; }
+  /* Quests */
+  .quest-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:12px; }
+  .q-item { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:14px; text-align:left; }
+  .q-item.done { border-color:rgba(125,219,106,.6); background:rgba(125,219,106,.08); }
+  .q-name { font-size:14px; font-weight:700; color:#fff; }
+  .q-desc { font-size:12px; color:#9fb0c0; margin-top:4px; }
+  .q-prog { display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .q-bar { flex:1; height:8px; background:rgba(255,255,255,.1); border-radius:4px; overflow:hidden; }
+  .q-fill { height:100%; background:linear-gradient(90deg,#4ac2ff,#8a6aff); }
+  .q-prog span { font-size:11px; color:#cfd6dd; }
+  .q-reward { font-size:12px; color:#ffd24a; margin-top:8px; font-weight:600; }
+  .market-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px; }
+  #questmenu,#marketmenu { z-index:60; background:radial-gradient(ellipse at 50% 30%, rgba(30,40,60,.9), rgba(8,10,14,.97)); }
   #buymenu { position:fixed; inset:0; z-index:40; background:rgba(5,7,10,.92); display:none; }
   #buymenu .bm-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
   #buymenu .bm-tab { pointer-events:auto; padding:6px 14px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:4px; cursor:pointer; }
@@ -480,6 +499,30 @@
   </div>
 </div>
 
+<!-- Quests menu -->
+<div id="questmenu" class="overlay hidden">
+  <div class="inv-wrap">
+    <div class="inv-head">
+      <span class="inv-title">📜 КВЕСТЫ</span>
+      <button class="inv-close" id="quest-close">✕</button>
+    </div>
+    <div class="quest-grid" id="quest-grid"></div>
+  </div>
+</div>
+
+<!-- Market menu -->
+<div id="marketmenu" class="overlay hidden">
+  <div class="inv-wrap">
+    <div class="inv-head">
+      <span class="inv-title">📊 РЫНОК</span>
+      <span class="inv-credits">🪙 <b id="market-bp">0</b></span>
+      <button class="inv-close" id="market-close">✕</button>
+    </div>
+    <div class="market-grid" id="market-grid"></div>
+    <div class="inv-hint">Продай скин — получишь 60% его цены в BP.</div>
+  </div>
+</div>
+
 <!-- Lobby -->
 <div id="lobby">
   <div class="lb-wrap">
@@ -494,15 +537,32 @@
     </div>
 
     <div class="lb-block">
-      <div class="lb-h">Создать игру</div>
-      <button class="lb-btn" id="lb-host">Создать комнату</button>
+      <div class="lb-h">Режим игры</div>
+      <div class="lb-modes">
+        <button class="lb-mode on" data-mode="casual" id="mode-casual">🎮 Казуал</button>
+        <button class="lb-mode" data-mode="competitive" id="mode-competitive">🏆 Компетитив</button>
+      </div>
+      <div class="lb-mode-hint" id="mode-hint">Казуал: боты заполняют слоты, 16 раундов. Для всех.</div>
     </div>
 
     <div class="lb-block">
-      <div class="lb-h">Присоединиться</div>
+      <div class="lb-h">Создать игру</div>
+      <button class="lb-btn" id="lb-host">Создать комнату</button>
+      <button class="lb-btn ghost" id="lb-quick" style="margin-top:8px">⚡ Быстрый вход (Quick Join)</button>
+    </div>
+
+    <div class="lb-block">
+      <div class="lb-h">Присоединиться по коду</div>
       <div class="lb-name-row">
         <input class="lb-input-el" id="lb-code" maxlength="6" placeholder="Код комнаты">
         <button class="lb-btn ghost" id="lb-join" style="width:auto;margin-top:0;padding:10px 16px">Войти</button>
+      </div>
+    </div>
+
+    <div class="lb-block">
+      <div class="lb-h">Сервер Browser</div>
+      <div class="lb-servers" id="lb-servers">
+        <div class="lb-serv-empty">P2P-сеть: комнаты открываются по коду. Создай комнату и поделись кодом, или используй Quick Join для случайного кода.</div>
       </div>
     </div>
 
@@ -1752,8 +1812,16 @@ function damageEntity(e, dmg, part, attacker, weaponName, weaponKind){
   }
   if(e.health <= 0){
     e.health = 0;
+    hookQuestsOnKill(attacker, weaponKind, part);
     killEntity(e, attacker, weaponName, weaponKind, part);
   }
+}
+// quest hooks for kills (call before killEntity — needs attacker/weapon/part)
+function hookQuestsOnKill(attacker, weaponKind, part){
+  if(!attacker || attacker !== player) return;
+  questProgress('q1', 1);
+  if(part === 'head') questProgress('q2', 1, 'head');
+  questProgress('q4', 1, weaponKind);
 }
 function killEntity(e, attacker, weaponName, weaponKind, part){
   if(!firstBloodDone && attacker && attacker.team !== e.team){
@@ -2834,6 +2902,8 @@ function showVictory(){
   // XP: +100 for win, +40 for loss
   profile.wins += win ? 1 : 0;
   addXP(win ? 100 : 40);
+  // quest: win a match
+  if(win) questProgress('q3', 1);
 }
 function resetMatch(){
   matchOver = false; matchWinner = null;
@@ -3215,6 +3285,92 @@ function initProfileUI(){
   });
 }
 
+// ---------- quests ----------
+let quests = [
+  {id:'q1', name:'Первые килы', desc:'Сделай 5 убийств в одном матче', need:5, reward:30, got:0, done:false},
+  {id:'q2', name:'Хедшотёр', desc:'Сделай 3 хедшота (в голову)', need:3, reward:40, got:0, done:false},
+  {id:'q3', name:'Победитель', desc:'Выиграй матч (16 раундов)', need:1, reward:80, got:0, done:false},
+  {id:'q4', name:'Снайпер', desc:'Убей 3 врагов из AWP или Scout', need:3, reward:50, got:0, done:false}
+];
+function loadQuests(){
+  try{ const q = JSON.parse(localStorage.getItem('bekastrike_quests')||'null'); if(q) quests = q; }catch(e){}
+}
+function saveQuests(){ localStorage.setItem('bekastrike_quests', JSON.stringify(quests)); }
+loadQuests();
+function questProgress(id, n, weaponKind){
+  const q = quests.find(x=>x.id===id);
+  if(!q || q.done) return;
+  // special condition for sniper quest
+  if(id==='q4' && !(weaponKind==='awp'||weaponKind==='scout')) return;
+  if(id==='q2' && weaponKind !== 'head') return; // headshots only (we pass 'head' as kind)
+  q.got = Math.min(q.need, q.got + n);
+  if(q.got >= q.need){
+    q.done = true;
+    profile.bp += q.reward;
+    saveProfile(profile);
+    announce('📜 КВЕСТ ВЫПОЛНЕН: ' + q.name + '! +' + q.reward + ' BP', null, '#8a6aff', 2.5);
+    AudioSys.tone(1200,0.15,0.3,'square');
+  }
+  saveQuests();
+  renderQuests();
+}
+function renderQuests(){
+  const grid = $('quest-grid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  for(const q of quests){
+    const div = document.createElement('div');
+    div.className = 'q-item' + (q.done ? ' done' : '');
+    div.innerHTML = `
+      <div class="q-name">${q.done ? '✅' : '📜'} ${q.name}</div>
+      <div class="q-desc">${q.desc}</div>
+      <div class="q-prog"><div class="q-bar"><div class="q-fill" style="width:${q.got/q.need*100}%"></div></div><span>${q.got}/${q.need}</span></div>
+      <div class="q-reward">Награда: +${q.reward} BP</div>
+    `;
+    grid.appendChild(div);
+  }
+}
+function openQuests(){
+  renderQuests();
+  $('questmenu').classList.remove('hidden');
+}
+
+// ---------- market (sell skins for BP) ----------
+function openMarket(){
+  const owned = ownedSkins();
+  const grid = $('market-grid');
+  grid.innerHTML = '';
+  if(owned.length === 0){
+    grid.innerHTML = '<div class="inv-hint" style="grid-column:1/-1;padding:30px 0">Нет скинов для продажи — купи в Магазине!</div>';
+  }
+  for(const id of owned){
+    const s = SKINS.find(x=>x.id===id);
+    if(!s) continue;
+    const div = document.createElement('div');
+    div.className = 'inv-item';
+    div.innerHTML = `
+      <div class="gun">🔫</div>
+      <div class="sn">${s.name}</div>
+      <div class="sw">${s.gun}</div>
+      <div class="pr" style="color:#7ddb6a">Продать за ${Math.floor(s.price*0.6)} BP</div>
+    `;
+    div.addEventListener('click', ()=>{
+      if(confirm('Продать ' + s.name + ' за ' + Math.floor(s.price*0.6) + ' BP?')){
+        const list = ownedSkins().filter(x=>x!==id);
+        saveOwned(list);
+        profile.bp += Math.floor(s.price*0.6);
+        saveProfile(profile);
+        announce('💵 Продано: ' + s.name + ' (+' + Math.floor(s.price*0.6) + ' BP)', null, '#7ddb6a', 2);
+        AudioSys.buy();
+        refreshMenuProfile();
+        openMarket();
+      }
+    });
+    grid.appendChild(div);
+  }
+  $('marketmenu').classList.remove('hidden');
+}
+
 // ---------- new menu wiring ----------
 let menuView = 'main';
 function showMenuView(v){
@@ -3250,12 +3406,10 @@ function initNewMenuUI(){
     buildInventory();
     $('invmenu').classList.remove('hidden');
   });
-  $('market-btn').addEventListener('click', ()=>{
-    announce('📊 Рынок скоро! Пока продаём скины за BP — скоро добавлю.', null, '#9dff9d', 2);
-  });
-  $('quests-btn').addEventListener('click', ()=>{
-    announce('📜 Квесты: сделай 5 килов в одном матче → +30 XP', null, '#8ab8ff', 2.5);
-  });
+  $('market-btn').addEventListener('click', openMarket);
+  $('quests-btn').addEventListener('click', openQuests);
+  $('quest-close').addEventListener('click', ()=>$('questmenu').classList.add('hidden'));
+  $('market-close').addEventListener('click', ()=>$('marketmenu').classList.add('hidden'));
   // map + team controls were in old menu — move map switch into playmode
   const mapRow = document.createElement('div');
   mapRow.className = 'team-switch';
@@ -4105,7 +4259,7 @@ function lbUpdatePlayers(){
 }
 function openLobby(){
   $('lobby').classList.add('open');
-  $('lb-name').value = localStorage.getItem('bekastrike_nick') || 'Боец';
+  $('lb-name').value = profile.registered ? profile.name : (localStorage.getItem('bekastrike_nick') || 'Боец');
   lbUpdatePlayers();
   if(!net.peer){
     net.peer = new Peer();
@@ -4113,6 +4267,25 @@ function openLobby(){
     net.peer.on('error', err=>{ if(err.type!=='peer-unavailable') lbLog('P2P: ' + (err.type||err), 'err'); });
   }
 }
+// lobby game mode: casual / competitive
+let lobbyMode = 'casual';
+function setLobbyMode(m){
+  lobbyMode = m;
+  $('mode-casual').classList.toggle('on', m==='casual');
+  $('mode-competitive').classList.toggle('on', m==='competitive');
+  $('mode-hint').textContent = m==='casual'
+    ? 'Казуал: боты заполняют слоты, 16 раундов. Для всех.'
+    : 'Компетитив: только игроки (без ботов), код комнаты обязателен. Для киберспортсменов!';
+}
+$('mode-casual').addEventListener('click', ()=>setLobbyMode('casual'));
+$('mode-competitive').addEventListener('click', ()=>setLobbyMode('competitive'));
+$('lb-quick').addEventListener('click', ()=>{
+  // Quick Join: generate a random 6-char code and try to join it
+  const code = netCode();
+  $('lb-code').value = code;
+  lbLog('⚡ Quick Join: пробую комнату ' + code + '…');
+  lbJoin();
+});
 function closeLobby(){
   $('lobby').classList.remove('open');
   if(net.peer){ net.peer.destroy(); net.peer = null; }
@@ -4136,8 +4309,10 @@ function lbHost(){
     net.peer = new Peer(pid);
     net.peer.on('open', ()=>{
       net.mode = 'host'; net.active = true; net.myId = pid;
+      net.gameMode = lobbyMode;
       net.peer.on('connection', conn=>hostHandleConn(conn));
       $('lb-room-code').textContent = net.roomCode;
+      $('lb-room-code').parentElement.previousElementSibling.textContent = 'Режим: ' + (lobbyMode==='competitive' ? '🏆 Компетитив' : '🎮 Казуал');
       lbUpdatePlayers();
       lbLog('Комната создана! Отправь код друзьям.', 'ok');
     });
@@ -4220,6 +4395,12 @@ function startMultiplayerMatch(){
   $('lobby').classList.remove('open');
   vmGroup.visible = true;
   camera.rotation.order = 'YXZ';
+  // hide bots in competitive (no-bot mode)
+  const comp = net.gameMode === 'competitive';
+  for(const b of bots){
+    b.group.visible = !comp;
+    b.shadow.visible = !comp;
+  }
   renderer.domElement.requestPointerLock();
   AudioSys.round();
 }
@@ -4310,7 +4491,8 @@ function loop(){
   updateBombDefuse(dt);
   updateHostages(dt);
   // host simulates bots; client renders bot snapshots (no local sim)
-  if(net.mode !== 'client'){
+  // competitive mode: no bots at all
+  if(net.mode !== 'client' && !(net.gameMode === 'competitive')){
     for(const b of bots) updateBot(b, dt);
   }
   updateGrenades(dt);
