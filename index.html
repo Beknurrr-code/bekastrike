@@ -1204,7 +1204,7 @@ function buildBot(team, name){
     mode:'patrol', target:null, fireT:0, thinkT:rand(0,0.5),
     wp:null, wpT:0, strafeDir:1, strafeT:0, speed:4.2, crouch:0, heard:null, walkT:0,
     weapon: BOT_WEAPONS[team][Math.random()<0.6?0:1],
-    ammo:null, reloading:false, reloadT:0, flashT:0,
+    ammo:null, reloading:false, reloadT:0, flashT:0, bought:false,
     lastDamager:null, money:800, diff:DIFF[settings.diff]
   };
   bot.ammo = {mag:WEAPONS[bot.weapon].mag, res:WEAPONS[bot.weapon].reserve};
@@ -1234,6 +1234,9 @@ function respawnBot(b){
   b.y = 0; b.vy = 0; b.health = d.hp; b.dead = false;
   b.mode = 'patrol'; b.target = null; b.fireT = 0; b.crouch = 0; b.heard = null;
   b.spawnProtect = 2; b.streak = 0; b.flashT = 0;
+  // reset buy state; bot keeps money between rounds (economy)
+  b.bought = false;
+  b.weapon = BOT_WEAPONS[b.team][Math.random()<0.6?0:1];
   b.ammo = {mag:WEAPONS[b.weapon].mag, res:WEAPONS[b.weapon].reserve};
   b.reloading = false;
   b.group.visible = true;
@@ -2114,6 +2117,11 @@ function updateHUD(){
   ch.querySelector('.ch.b').style.top = (6+off) + 'px';
   ch.querySelector('.ch.l').style.left = (-14-off) + 'px';
   ch.querySelector('.ch.r').style.left = (6+off) + 'px';
+  // crosshair color: green (accurate/standing), white (moving), red (spraying)
+  let chColor = '#fff';
+  if(player.moving) chColor = '#ff6b5a';
+  if(!player.moving && spread < 0.01) chColor = '#6aff5a';
+  for(const part of ch.querySelectorAll('.ch,.dot')) part.style.background = chColor;
   const hm = $('hitmarker');
   if(hitmarkT > 0){
     hm.style.opacity = 1;
@@ -2597,7 +2605,19 @@ function defuseBomb(){
   }
 }
 function updateBombDefuse(dt){
-  if(!bomb || !bomb.planted || !bomb.defusing) return;
+  if(!bomb || !bomb.planted) return;
+  // bomb beep: faster as it nears detonation (CS-style)
+  bomb.beepT = (bomb.beepT||0) - dt;
+  const interval = bomb.plantT > 10 ? 1.0 : bomb.plantT > 5 ? 0.5 : 0.25;
+  if(bomb.beepT <= 0){
+    bomb.beepT = interval;
+    AudioSys.tone(1200, 0.06, 0.25, 'square');
+    // red pulse on the bomb mesh
+    if(bomb.mesh){
+      bomb.mesh.scale.setScalar(1 + 0.15*Math.sin(performance.now()*0.02));
+    }
+  }
+  if(!bomb.defusing) return;
   // someone must stay near the bomb
   const playerNear = player.team === 'CT' && !player.dead && dist3(player.x,0,player.z, bomb.x,0,bomb.z) < 2.5;
   const botNear = bots.some(b=>b.team==='CT' && !b.dead && dist3(b.x,0,b.z, bomb.x,0,bomb.z) < 2);
@@ -2671,6 +2691,11 @@ document.addEventListener('keydown', e=>{
   if(e.code === 'Tab'){ e.preventDefault(); updateScoreboard(); $('scoreboard').classList.add('open'); }
   keys[e.code] = true;
   if(e.code === 'KeyB') toggleBuyMenu(!$('buymenu').classList.contains('open'));
+  // buy menu quick category keys (CS-style: 1-5 while menu open)
+  if($('buymenu').classList.contains('open')){
+    const catKeys = {'Digit1':'pistol','Digit2':'smg','Digit3':'rifle','Digit4':'sniper','Digit5':'gear'};
+    if(catKeys[e.code]){ buyCat = catKeys[e.code]; buildBuyMenu(); refreshBuyMenu(); }
+  }
   if(e.code === 'KeyR' && !player.dead) startReload();
   if(e.code === 'KeyM'){ AudioSys.muted = !AudioSys.muted; if(AudioSys.master) AudioSys.master.gain.value = AudioSys.muted ? 0 : settings.vol; }
   if(e.code === 'Digit1') switchWeapon(player.weapons.awp ? 'awp' : player.weapons.scout ? 'scout' : player.weapons.m249 ? 'm249' : player.weapons.sg552 ? 'sg552' : player.weapons.aug ? 'aug' : player.weapons.m4 ? 'm4' : player.weapons.ak ? 'ak' : player.weapons.p90 ? 'p90' : player.weapons.ump ? 'ump' : player.weapons.mp5 ? 'mp5' : null);
@@ -3161,6 +3186,19 @@ function updateBot(b, dt){
   let moveX = 0, moveZ = 0;
   // FREEZE: bots hold position during freeze time (like the player)
   if(roundState === 'freeze'){
+    // bots buy weapons during freeze (economy like CS)
+    if(!b.bought){
+      b.bought = true;
+      const buyOptions = b.team === 'CT' ? ['m4','mp5','ump','awp','scout'] : ['ak','sg552','p90','awp','scout'];
+      // rich bots buy rifles, poor bots stay with pistol
+      if(b.money >= 2700 && Math.random() < 0.7){
+        const pick = buyOptions[Math.floor(Math.random()*buyOptions.length)];
+        if(WEAPONS[pick] && WEAPONS[pick].price <= b.money){
+          b.weapon = pick;
+          b.ammo = {mag:WEAPONS[pick].mag, res:WEAPONS[pick].reserve};
+        }
+      }
+    }
     // bots stand still, look around a bit
     b.yaw += Math.sin(b.walkT||0)*0.05;
     moveX = 0; moveZ = 0;
