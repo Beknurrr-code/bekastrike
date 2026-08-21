@@ -107,14 +107,16 @@
   #scope .sc-ring { position:absolute; left:50%; top:50%; width:48%; height:48%; transform:translate(-50%,-50%); border:2px solid rgba(0,0,0,.85); border-radius:50%; }
 
   /* ===== Overlays ===== */
-  .overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:rgba(8,10,14,.82); }
+  .overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 30%, rgba(30,40,60,.85), rgba(8,10,14,.95)); }
   .overlay.hidden { display:none; }
-  .menu { text-align:center; max-width:680px; padding:20px; }
-  .title { font-size:60px; font-weight:800; letter-spacing:4px; color:#ffd24a; text-shadow:0 4px 0 #7a5a00, 0 8px 24px rgba(0,0,0,.8); }
-  .title .v2 { color:#fff; font-size:22px; vertical-align:super; letter-spacing:0; text-shadow:0 2px 0 #555; }
-  .subtitle { font-size:15px; color:#9fb0c0; letter-spacing:6px; text-transform:uppercase; margin-top:4px; }
-  .btn { pointer-events:auto; display:inline-block; margin-top:24px; padding:14px 48px; font-size:20px; font-weight:700; color:#111; background:linear-gradient(#ffd24a,#e0a800); border:none; border-radius:4px; cursor:pointer; box-shadow:0 4px 0 #8a6a00, 0 8px 20px rgba(0,0,0,.5); transition:transform .05s; }
-  .btn:hover { transform:translateY(-1px); }
+  .menu { text-align:center; max-width:720px; padding:30px 44px; background:linear-gradient(160deg, rgba(20,26,38,.9), rgba(10,14,22,.94)); border:1px solid rgba(255,255,255,.1); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter:blur(10px); }
+  .title { font-size:64px; font-weight:800; letter-spacing:5px; background:linear-gradient(180deg, #ffe28a, #ffd24a 55%, #c89200); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 40px rgba(255,210,74,.25); filter:drop-shadow(0 3px 0 rgba(122,90,0,.6)); animation:titleGlow 3s ease-in-out infinite; }
+  @keyframes titleGlow { 0%,100%{ filter:drop-shadow(0 0 14px rgba(255,210,74,.25)); } 50%{ filter:drop-shadow(0 0 30px rgba(255,210,74,.5)); } }
+  .title .v2 { color:#fff; font-size:22px; vertical-align:super; letter-spacing:0; -webkit-text-fill-color:#fff; }
+  .subtitle { font-size:15px; color:#9fb0c0; letter-spacing:7px; text-transform:uppercase; margin-top:4px; }
+  .logo-row { font-size:13px; color:#6a7a8a; letter-spacing:4px; text-transform:uppercase; margin-bottom:6px; }
+  .btn { pointer-events:auto; display:inline-block; margin-top:24px; padding:15px 56px; font-size:20px; font-weight:700; color:#111; background:linear-gradient(180deg, #ffe28a, #e0a800); border:none; border-radius:6px; cursor:pointer; box-shadow:0 4px 0 #8a6a00, 0 10px 30px rgba(255,210,74,.15); transition:transform .06s, box-shadow .15s; letter-spacing:1px; }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 6px 0 #8a6a00, 0 14px 40px rgba(255,210,74,.35); }
   .btn:active { transform:translateY(2px); box-shadow:0 2px 0 #8a6a00; }
   .btn.small { padding:10px 26px; font-size:15px; margin:0 6px; }
   .btn.gray { background:linear-gradient(#9aa4ad,#6a727a); box-shadow:0 4px 0 #3a4046; }
@@ -341,15 +343,16 @@
 <!-- Main menu -->
 <div class="overlay" id="mainmenu">
   <div class="menu">
-    <div class="title">BEKASTRIKE<span class="v2">2.0</span></div>
-    <div class="subtitle">FPS в стиле Counter-Strike</div>
-    <button class="btn" id="play-btn">ИГРАТЬ</button>
+    <div class="logo-row">💣 BekaStrike</div>
+    <div class="title">BEKASTRIKE<span class="v2">CS2</span></div>
+    <div class="subtitle">FPS в стиле Counter-Strike 2</div>
+    <button class="btn" id="play-btn">▶ ИГРАТЬ</button>
     <button class="btn gray" id="mp-btn" style="margin-top:10px">🌐 МУЛЬТИПЛЕЕР</button>
-    <div class="team-switch" style="margin-top:10px">
+    <div class="team-switch" style="margin-top:12px">
       <button class="btn small" id="team-ct-btn" style="background:linear-gradient(#4a8ac2,#2f6db5); color:#fff; box-shadow:0 3px 0 #1c3f5e">CT</button>
       <button class="btn small gray" id="team-t-btn">T</button>
     </div>
-    <div class="map-switch" style="margin-top:10px">
+    <div class="map-switch" style="margin-top:12px">
       <button class="btn small gray" id="map-prev">◀</button>
       <span class="map-name" id="map-name">Dust (пустыня)</span>
       <button class="btn small gray" id="map-next">▶</button>
@@ -379,7 +382,7 @@
       <span><b>Tab</b></span><span>счёт</span>
       <span><b>M</b></span><span>звук вкл/выкл</span>
     </div>
-    <div class="hintline">Команда CT против террористов. Первые 30 убийств побеждают. Удачи, Beknur!</div>
+    <div class="hintline">Команда CT против террористов. До 16 раундов. Удачи, Beknur!</div>
   </div>
 </div>
 
