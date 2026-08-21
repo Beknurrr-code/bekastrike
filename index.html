@@ -107,19 +107,25 @@
   #scope .sc-ring { position:absolute; left:50%; top:50%; width:48%; height:48%; transform:translate(-50%,-50%); border:2px solid rgba(0,0,0,.85); border-radius:50%; }
 
   /* ===== Overlays ===== */
-  .overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 30%, rgba(30,40,60,.85), rgba(8,10,14,.95)); }
+  .overlay { position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center; background:radial-gradient(ellipse at 50% 30%, rgba(30,40,60,.85), rgba(8,10,14,.95)); overflow:hidden; }
   .overlay.hidden { display:none; }
-  .menu { text-align:center; max-width:720px; padding:30px 44px; background:linear-gradient(160deg, rgba(20,26,38,.9), rgba(10,14,22,.94)); border:1px solid rgba(255,255,255,.1); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter:blur(10px); }
-  .title { font-size:64px; font-weight:800; letter-spacing:5px; background:linear-gradient(180deg, #ffe28a, #ffd24a 55%, #c89200); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 40px rgba(255,210,74,.25); filter:drop-shadow(0 3px 0 rgba(122,90,0,.6)); animation:titleGlow 3s ease-in-out infinite; }
-  @keyframes titleGlow { 0%,100%{ filter:drop-shadow(0 0 14px rgba(255,210,74,.25)); } 50%{ filter:drop-shadow(0 0 30px rgba(255,210,74,.5)); } }
+  /* animated aurora background for menus */
+  .menu-bg { position:absolute; inset:-20%; pointer-events:none; z-index:0; background:radial-gradient(600px circle at var(--bx1,20%) var(--by1,30%), rgba(255,180,60,.14), transparent 60%), radial-gradient(500px circle at var(--bx2,80%) var(--by2,70%), rgba(90,140,255,.12), transparent 60%), radial-gradient(400px circle at var(--bx3,50%) var(--by3,90%), rgba(255,90,180,.08), transparent 60%); animation:bgDrift 16s ease-in-out infinite alternate; }
+  @keyframes bgDrift { 0%{ transform:translate(0,0) scale(1); } 50%{ transform:translate(2%,-1%) scale(1.06); } 100%{ transform:translate(-2%,1%) scale(1.03); } }
+  .menu { position:relative; z-index:1; text-align:center; max-width:720px; padding:30px 44px; background:linear-gradient(160deg, rgba(20,26,38,.85), rgba(10,14,22,.9)); border:1px solid rgba(255,255,255,.12); border-radius:16px; box-shadow:0 24px 80px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter:blur(14px); animation:menuIn .4s cubic-bezier(.2,.9,.3,1.2); }
+  @keyframes menuIn { from{ opacity:0; transform:translateY(24px) scale(.96); } to{ opacity:1; transform:none; } }
+  .title { font-size:66px; font-weight:800; letter-spacing:5px; background:linear-gradient(180deg, #ffe28a, #ffd24a 55%, #c89200); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 40px rgba(255,210,74,.25); filter:drop-shadow(0 3px 0 rgba(122,90,0,.6)); animation:titleGlow 3s ease-in-out infinite; }
+  @keyframes titleGlow { 0%,100%{ filter:drop-shadow(0 0 14px rgba(255,210,74,.25)); } 50%{ filter:drop-shadow(0 0 34px rgba(255,210,74,.55)); } }
   .title .v2 { color:#fff; font-size:22px; vertical-align:super; letter-spacing:0; -webkit-text-fill-color:#fff; }
   .subtitle { font-size:15px; color:#9fb0c0; letter-spacing:7px; text-transform:uppercase; margin-top:4px; }
   .logo-row { font-size:13px; color:#6a7a8a; letter-spacing:4px; text-transform:uppercase; margin-bottom:6px; }
-  .btn { pointer-events:auto; display:inline-block; margin-top:24px; padding:15px 56px; font-size:20px; font-weight:700; color:#111; background:linear-gradient(180deg, #ffe28a, #e0a800); border:none; border-radius:6px; cursor:pointer; box-shadow:0 4px 0 #8a6a00, 0 10px 30px rgba(255,210,74,.15); transition:transform .06s, box-shadow .15s; letter-spacing:1px; }
-  .btn:hover { transform:translateY(-2px); box-shadow:0 6px 0 #8a6a00, 0 14px 40px rgba(255,210,74,.35); }
+  .btn { pointer-events:auto; display:inline-block; margin-top:24px; padding:15px 56px; font-size:20px; font-weight:700; color:#111; background:linear-gradient(180deg, #ffe28a, #e0a800); border:none; border-radius:8px; cursor:pointer; box-shadow:0 4px 0 #8a6a00, 0 10px 30px rgba(255,210,74,.15); transition:transform .1s, box-shadow .2s, filter .2s; letter-spacing:1px; }
+  .btn:hover { transform:translateY(-3px); box-shadow:0 7px 0 #8a6a00, 0 18px 50px rgba(255,210,74,.4); filter:brightness(1.08); }
   .btn:active { transform:translateY(2px); box-shadow:0 2px 0 #8a6a00; }
   .btn.small { padding:10px 26px; font-size:15px; margin:0 6px; }
-  .btn.gray { background:linear-gradient(#9aa4ad,#6a727a); box-shadow:0 4px 0 #3a4046; }
+  .btn.gray { background:linear-gradient(180deg, #b4bcc4, #6a727a); box-shadow:0 4px 0 #3a4046, 0 8px 20px rgba(0,0,0,.3); }
+  .btn.gray:hover { box-shadow:0 6px 0 #3a4046, 0 14px 36px rgba(150,170,200,.25); }
+  .btn.big { padding:16px 68px; font-size:22px; }
   .controls { margin-top:22px; display:inline-grid; grid-template-columns:auto auto; gap:5px 18px; text-align:left; font-size:13px; color:#c8d2dc; }
   .controls b { color:#fff; background:rgba(255,255,255,.12); padding:1px 8px; border-radius:3px; font-weight:600; }
   .hintline { margin-top:16px; font-size:12px; color:#7d8b99; }
@@ -164,23 +170,25 @@
   .inv-btn:hover { background:rgba(255,210,74,.2); }
 
   /* ===== New main menu (CS2-style hub) ===== */
-  .mainmenu-new { max-width:640px; }
-  .prof-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:10px 14px; margin-top:14px; text-align:left; }
-  .prof-left { display:flex; align-items:center; gap:10px; }
-  .prof-avatar { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#ffd24a,#c89200); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 12px rgba(255,210,74,.3); }
-  .prof-name { font-size:15px; font-weight:700; color:#fff; }
+  .mainmenu-new { max-width:680px; }
+  .prof-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; background:linear-gradient(135deg, rgba(255,210,74,.08), rgba(255,255,255,.03)); border:1px solid rgba(255,210,74,.25); border-radius:12px; padding:12px 16px; margin-top:14px; text-align:left; transition:box-shadow .3s; }
+  .prof-bar:hover { box-shadow:0 0 24px rgba(255,210,74,.15); }
+  .prof-left { display:flex; align-items:center; gap:12px; }
+  .prof-avatar { width:46px; height:46px; border-radius:50%; background:linear-gradient(135deg,#ffd24a,#c89200); display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 0 16px rgba(255,210,74,.4); }
+  .prof-name { font-size:16px; font-weight:700; color:#fff; }
   .prof-lvl { font-size:12px; color:#9fb0c0; }
   .prof-lvl b { color:#ffd24a; }
   .prof-right { display:flex; align-items:center; gap:12px; }
-  .prof-stat { font-size:12px; color:#cfd6dd; }
+  .prof-stat { font-size:12px; color:#cfd6dd; background:rgba(255,255,255,.05); padding:4px 10px; border-radius:8px; border:1px solid rgba(255,255,255,.08); }
   .prof-stat b { color:#fff; font-size:14px; }
-  .prof-btn { padding:5px 12px; font-size:12px; font-weight:600; color:#ffd24a; background:rgba(255,210,74,.12); border:1px solid rgba(255,210,74,.4); border-radius:6px; cursor:pointer; }
-  .prof-btn:hover { background:rgba(255,210,74,.25); }
-  .xp-bar-wrap { margin-top:10px; height:18px; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.12); border-radius:9px; overflow:hidden; }
-  .xp-bar { height:100%; width:0%; background:linear-gradient(90deg,#4ac2ff,#8a6aff); transition:width .5s; display:flex; align-items:center; justify-content:center; }
+  .prof-btn { padding:6px 14px; font-size:12px; font-weight:700; color:#111; background:linear-gradient(180deg,#ffe28a,#e0a800); border:none; border-radius:8px; cursor:pointer; box-shadow:0 3px 0 #8a6a00; transition:transform .1s; }
+  .prof-btn:hover { transform:translateY(-1px); }
+  .xp-bar-wrap { margin-top:10px; height:20px; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.12); border-radius:10px; overflow:hidden; }
+  .xp-bar { height:100%; width:0%; background:linear-gradient(90deg,#4ac2ff,#8a6aff,#c04aff); background-size:200% 100%; animation:xpshine 3s linear infinite; transition:width .5s; display:flex; align-items:center; justify-content:center; }
+  @keyframes xpshine { 0%{background-position:0% 0;} 100%{background-position:200% 0;} }
   .xp-bar span { font-size:10px; font-weight:700; color:#fff; text-shadow:0 1px 2px #000; }
-  .btn-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
-  .btn.grid-btn { margin:0; padding:12px 8px; font-size:13px; border-radius:8px; }
+  .btn-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:14px; }
+  .btn.grid-btn { margin:0; padding:14px 8px; font-size:13px; border-radius:10px; }
   .playmode { margin-top:16px; }
   .pm-title { color:#ffd24a; font-size:14px; letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; }
   .hidden { display:none !important; }
@@ -409,6 +417,7 @@
 
 <!-- Main menu -->
 <div class="overlay" id="mainmenu">
+  <div class="menu-bg"></div>
   <div class="menu mainmenu-new">
     <div class="logo-row">💣 BekaStrike</div>
     <div class="title">BEKASTRIKE<span class="v2">CS2</span></div>
@@ -3266,6 +3275,19 @@ function refreshMenuProfile(){
 }
 function initProfileUI(){
   refreshMenuProfile();
+  // animate menu aurora background (CSS vars drift)
+  let bgT = 0;
+  setInterval(()=>{
+    bgT += 0.004;
+    const bg = document.querySelector('.menu-bg');
+    if(!bg) return;
+    bg.style.setProperty('--bx1', (20 + Math.sin(bgT)*12) + '%');
+    bg.style.setProperty('--by1', (30 + Math.cos(bgT*0.8)*10) + '%');
+    bg.style.setProperty('--bx2', (80 + Math.cos(bgT*0.6)*10) + '%');
+    bg.style.setProperty('--by2', (70 + Math.sin(bgT*0.9)*12) + '%');
+    bg.style.setProperty('--bx3', (50 + Math.sin(bgT*0.5)*15) + '%');
+    bg.style.setProperty('--by3', (90 + Math.cos(bgT*0.7)*8) + '%');
+  }, 100);
   $('prof-reg-btn').addEventListener('click', ()=>{
     if(profile.registered){
       announce('Ты уже зарегистрирован: ' + profile.name, null, '#ffd24a', 1.5);
