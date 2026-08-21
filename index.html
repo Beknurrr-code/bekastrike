@@ -3121,30 +3121,43 @@ function updateBot(b, dt){
   const blinded = b.flashT > 0;
   if(b.mode === 'combat' && b.target && !blinded){
     const tx = b.target.x, tz = b.target.z;
-    const ang = Math.atan2(tx - b.x, tz - b.z);
-    let dAng = ang - b.yaw;
-    while(dAng > Math.PI) dAng -= Math.PI*2;
-    while(dAng < -Math.PI) dAng += Math.PI*2;
-    b.yaw += dAng * Math.min(1, dt*8);
+    // aim angle: where the gun should point
+    const aimAng = Math.atan2(tx - b.x, tz - b.z);
+    let dAim = aimAng - b.yaw;
+    while(dAim > Math.PI) dAim -= Math.PI*2;
+    while(dAim < -Math.PI) dAim += Math.PI*2;
     const d = dist3(b.x,0,b.z, tx,0,tz);
     // combat range: approach to ~10m, hold distance (no back-and-forth jitter)
-    const wantShoot = d < 30 && Math.abs(dAng) < 0.5 && !b.reloading;
+    let wantShoot = d < 30 && Math.abs(dAim) < 0.55 && !b.reloading;
     if(wantShoot && b.burstCount > 0){
       // hold position while firing
       moveX = 0; moveZ = 0;
-    } else if(d > 12){ moveX = Math.sin(b.yaw); moveZ = Math.cos(b.yaw); }
-    else if(d < 7){ moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw); }
+    } else if(d > 12){ moveX = Math.sin(aimAng); moveZ = Math.cos(aimAng); }
+    else if(d < 7){ moveX = -Math.sin(aimAng); moveZ = -Math.cos(aimAng); }
     else { moveX = 0; moveZ = 0; } // 7-12m: hold position, don't jitter
     // low HP: retreat to cover (back away)
     if(b.health < 30 && d < 20){
-      moveX = -Math.sin(b.yaw); moveZ = -Math.cos(b.yaw);
+      moveX = -Math.sin(aimAng); moveZ = -Math.cos(aimAng);
       b.strafeT = 0;
+      wantShoot = false;
     }
     b.strafeT -= dt;
     if(b.strafeT > 0 && !wantShoot && d < 18){
-      moveX += Math.cos(b.yaw) * b.strafeDir * 0.7;
-      moveZ += -Math.sin(b.yaw) * b.strafeDir * 0.7;
+      moveX += Math.cos(aimAng) * b.strafeDir * 0.7;
+      moveZ += -Math.sin(aimAng) * b.strafeDir * 0.7;
     }
+    // body faces the direction of movement; when shooting — faces the target
+    const movingDir = Math.hypot(moveX, moveZ) > 0.01;
+    let bodyAng;
+    if(wantShoot || b.aimT > 0 || !movingDir){
+      bodyAng = aimAng; // face target to fire
+    } else {
+      bodyAng = Math.atan2(moveX, moveZ); // face the way we run
+    }
+    let dB = bodyAng - b.yaw;
+    while(dB > Math.PI) dB -= Math.PI*2;
+    while(dB < -Math.PI) dB += Math.PI*2;
+    b.yaw += dB * Math.min(1, dt*8);
     // reaction delay: bot aims for a moment before first shot
     if(b.aimT !== undefined && b.aimT > 0){
       b.aimT -= dt;
