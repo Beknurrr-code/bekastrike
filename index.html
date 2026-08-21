@@ -1007,10 +1007,11 @@ const WEAPONS = {
   awp:     {name:'AWP',        slot:3, dmg:115, head:4, rate:1.5,  auto:false, mag:5,  reserve:30, reload:3.5, spread:0.001, price:4750, kind:'awp',  range:300, zoom:true},
   m249:    {name:'M249',       slot:3, dmg:28,  head:4, rate:0.08, auto:true,  mag:100, reserve:200, reload:4.5, spread:0.03,  price:5200, kind:'m249', range:200},
   he:      {name:'HE Граната', slot:4, dmg:100, price:300, count:1, kind:'he'},
+  molotov: {name:'Молотов',    slot:4, price:400, count:1, kind:'molotov'},
   smoke:   {name:'Дымовая',    slot:5, price:300, count:1, kind:'smoke'},
   flash:   {name:'Флешка',     slot:6, price:200, count:1, kind:'flash'}
 };
-const WEAPON_ICON = {knife:'🔪', usp:'🔫', glock:'🔫', fiveseven:'🔫', deagle:'🔫', mp5:'🔫', ump:'🔫', p90:'🔫', ak:'🔫', m4:'🔫', sg552:'🔫', aug:'🔫', scout:'🎯', awp:'🎯', m249:'🔫', he:'💣', smoke:'💨', flash:'⚡'};
+const WEAPON_ICON = {knife:'🔪', usp:'🔫', glock:'🔫', fiveseven:'🔫', deagle:'🔫', mp5:'🔫', ump:'🔫', p90:'🔫', ak:'🔫', m4:'🔫', sg552:'🔫', aug:'🔫', scout:'🎯', awp:'🎯', m249:'🔫', he:'💣', molotov:'🔥', smoke:'💨', flash:'⚡'};
 
 // ---------- difficulty ----------
 const DIFF = {
@@ -1049,7 +1050,7 @@ const player = {
   vy:0, onGround:true, crouch:0, eyeH:1.7, radius:0.4,
   yaw:0, pitch:0, health:100, armor:100, money:800,
   dead:false, respawnT:0, kills:0, deaths:0, streak:0, spawnProtect:0,
-  weapons:{usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, smoke:0, flash:0},
+  weapons:{usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0},
   cur:'usp',
   cookT:0, // grenade cooking time while LMB held
   flashT:0, // flashbang blindness timer
@@ -1073,9 +1074,19 @@ function buildViewmodel(kind){
   if(kind==='knife'){
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.3), mat2); b.position.set(0,0,-0.2); vmGun.add(b);
     const h = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.12,0.12), mat); h.position.set(0,-0.05,0.05); vmGun.add(h);
-  } else if(kind==='he' || kind==='smoke' || kind==='flash'){
-    const s = new THREE.Mesh(new THREE.SphereGeometry(0.09,10,10), new THREE.MeshLambertMaterial({color: kind==='he'?0x3f7a3f: kind==='flash'?0xe8e8e8:0x8a8a8a}));
-    s.position.set(0,0,-0.25); vmGun.add(s);
+  } else if(kind==='he' || kind==='smoke' || kind==='flash' || kind==='molotov'){
+    if(kind==='molotov'){
+      // molotov: bottle with rag
+      const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,0.16,8), new THREE.MeshLambertMaterial({color:0x3a5a2a}));
+      bottle.position.set(0,0,-0.25); vmGun.add(bottle);
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.06,6), new THREE.MeshLambertMaterial({color:0x5a4a2a}));
+      neck.position.set(0,0.1,-0.25); vmGun.add(neck);
+      const rag = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.05,0.04), new THREE.MeshLambertMaterial({color:0xaa5522}));
+      rag.position.set(0,0.14,-0.25); vmGun.add(rag);
+    } else {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.09,10,10), new THREE.MeshLambertMaterial({color: kind==='he'?0x3f7a3f: kind==='flash'?0xe8e8e8:0x8a8a8a}));
+      s.position.set(0,0,-0.25); vmGun.add(s);
+    }
   } else if(kind==='awp'){
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.1,0.7), mat); body.position.set(0,0,-0.4); vmGun.add(body);
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.035,0.035,0.5), mat2); barrel.position.set(0,0.01,-0.85); vmGun.add(barrel);
@@ -1396,6 +1407,11 @@ function explodeGrenade(gr){
     }
     return;
   }
+  if(gr.kind === 'molotov'){
+    // molotov: burning zone that damages over time (CS2-style incendiary)
+    spawnFire(gr.x, gr.z);
+    return;
+  }
   AudioSys.explosion();
   const flash = new THREE.PointLight(0xffa040, 3, 30);
   flash.position.set(gr.x, gr.y, gr.z);
@@ -1427,6 +1443,59 @@ function explodeGrenade(gr){
   }
   const pd = dist3(player.x, player.y+1, player.z, gr.x, gr.y, gr.z);
   if(pd < 12) shake = Math.max(shake, (1 - pd/12) * 0.5);
+}
+
+// ---------- fire (molotov, CS2-style) ----------
+let fires = []; // {x,z,t,life,light}
+function spawnFire(x, z){
+  const light = new THREE.PointLight(0xff7a2a, 2.5, 12);
+  light.position.set(x, 0.8, z);
+  scene.add(light);
+  // fire floor disc
+  const c = document.createElement('canvas'); c.width=c.height=64;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32,32,4,32,32,30);
+  gr.addColorStop(0,'rgba(255,120,30,0.9)');
+  gr.addColorStop(0.6,'rgba(255,160,40,0.45)');
+  gr.addColorStop(1,'rgba(255,180,60,0)');
+  g.fillStyle = gr; g.fillRect(0,0,64,64);
+  const disc = new THREE.Mesh(new THREE.PlaneGeometry(4.5,4.5), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+  disc.rotation.x = -Math.PI/2;
+  disc.position.set(x, 0.06, z);
+  scene.add(disc);
+  fires.push({x, z, t:0, life:7, disc, light});
+  AudioSys.tone(200, 0.4, 0.3, 'sawtooth', -60);
+  announce('🔥 ОГОНЬ!', null, '#ff7a2a', 1);
+}
+function updateFire(dt){
+  for(const f of fires){
+    f.t += dt; f.life -= dt;
+    // flames particles
+    if(Math.random() < 0.5){
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.1), new THREE.MeshBasicMaterial({color: Math.random()<0.5?0xff7a2a:0xffc040}));
+      p.position.set(f.x + rand(-1.5,1.5), 0.2, f.z + rand(-1.5,1.5));
+      scene.add(p);
+      particles.push({mesh:p, life:rand(0.3,0.6), max:0.6, vx:rand(-0.5,0.5), vy:rand(2,4), vz:rand(-0.5,0.5)});
+    }
+    // damage over time
+    if(f.t > 0.5){
+      for(const e of entities){
+        if(e.dead) continue;
+        const d = dist3(e.x,0,e.z, f.x,0,f.z);
+        if(d < 2.2){
+          damageEntity(e, 8, 'body', null, 'Огонь', 'molotov');
+        }
+      }
+    }
+    // flicker
+    if(f.light) f.light.intensity = 1.5 + Math.random()*1.5;
+    f.disc.material.opacity = Math.min(1, f.life/2);
+    if(f.life <= 0){
+      scene.remove(f.disc); scene.remove(f.light);
+      f.dead = true;
+    }
+  }
+  fires = fires.filter(f=>!f.dead);
 }
 
 // ---------- smoke ----------
@@ -2284,6 +2353,7 @@ const BUY_ITEMS = [
   {id:'awp',    name:'AWP',          desc:'Снайперка · 115 урона · зум', price:4750, cat:'sniper'},
   {id:'armor',  name:'Бронежилет',   desc:'Полная броня 100', price:650, cat:'gear'},
   {id:'he',     name:'HE Граната',    desc:'Урон по площади', price:300, cat:'gear'},
+  {id:'molotov',name:'Молотов',       desc:'🔥 Огненная зона урона', price:400, cat:'gear'},
   {id:'smoke',  name:'Дымовая',       desc:'Дым · слепит ботов', price:300, cat:'gear'},
   {id:'flash',  name:'Флешка',        desc:'Ослепляет врагов', price:200, cat:'gear'},
   {id:'skin',   name:'Скин оружия',   desc:'Случайный цвет ствола', price:150, cat:'gear'}
@@ -2341,8 +2411,21 @@ function buyItem(id){
   if(id==='skin'){
     if(player.money < it.price){ AudioSys.deny(); return; }
     player.money -= it.price;
-    const colors = [0xff4444,0x44ff44,0x4444ff,0xffaa00,0xff44ff,0x44ffff,0xffffff,0x888888];
-    player.skinColor = colors[Math.floor(Math.random()*colors.length)];
+    // CS2-style named skins
+    const skins = [
+      {name:'AK-47 | Redline', color:0xc82020},
+      {name:'AWP | Asiimov',   color:0xf5a623},
+      {name:'M4A4 | Howl',     color:0xe0402a},
+      {name:'AK-47 | Fire Serpent', color:0xd04030},
+      {name:'AWP | Dragon Lore', color:0xb8860b},
+      {name:'Glock | Fade',    color:0xe040a0},
+      {name:'USP-S | Kill Confirmed', color:0x20c8c8},
+      {name:'M4A1 | Hyper Beast', color:0x30a0e0}
+    ];
+    const sk = skins[Math.floor(Math.random()*skins.length)];
+    player.skinColor = sk.color;
+    player.skinName = sk.name;
+    announce('🎨 ' + sk.name, null, '#ffd24a', 1.5);
     buildViewmodel(player.cur);
     AudioSys.buy();
     refreshBuyMenu();
@@ -2457,7 +2540,7 @@ function startRound(){
   // reset player
   player.health = 100; player.armor = 100; player.dead = false; player.spawnProtect = 2;
   player.streak = 0; player.flashT = 0; $('flashfx').style.opacity = 0; player.cookT = 0;
-  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, smoke:0, flash:0};
+  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0};
   player.cur = 'usp';
   player.ammo = {usp:{mag:12,res:36}, glock:{mag:20,res:60}, fiveseven:{mag:20,res:60}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ump:{mag:25,res:75}, p90:{mag:50,res:150}, ak:{mag:30,res:90}, m4:{mag:30,res:90}, sg552:{mag:30,res:90}, aug:{mag:30,res:90}, scout:{mag:10,res:30}, awp:{mag:5,res:30}, m249:{mag:100,res:200}};
   const spawns = player.team === 'CT' ? CT_SPAWNS : T_SPAWNS;
@@ -2496,7 +2579,7 @@ function resetMatch(){
   ctRounds = 0; tRounds = 0; roundNum = 0;
   player.health = 100; player.armor = 100; player.money = 800;
   player.kills = 0; player.deaths = 0; player.dead = false; player.streak = 0; player.spawnProtect = 0;
-  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, smoke:0, flash:0};
+  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0};
   player.cur = 'usp';
   player.ammo = {usp:{mag:12,res:36}, glock:{mag:20,res:60}, fiveseven:{mag:20,res:60}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ump:{mag:25,res:75}, p90:{mag:50,res:150}, ak:{mag:30,res:90}, m4:{mag:30,res:90}, sg552:{mag:30,res:90}, aug:{mag:30,res:90}, scout:{mag:10,res:30}, awp:{mag:5,res:30}, m249:{mag:100,res:200}};
   player.x = CT_SPAWNS[0][0]; player.z = CT_SPAWNS[0][1]; player.y = 0; player.vy = 0;
@@ -2650,7 +2733,7 @@ function resetMatch(){
   ctScore = 0; tScore = 0; matchTime = 600;
   player.health = 100; player.armor = 100; player.money = 800;
   player.kills = 0; player.deaths = 0; player.dead = false; player.streak = 0; player.spawnProtect = 0;
-  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, smoke:0, flash:0};
+  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0};
   player.cur = 'usp';
   player.ammo = {usp:{mag:12,res:36}, glock:{mag:20,res:60}, fiveseven:{mag:20,res:60}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ump:{mag:25,res:75}, p90:{mag:50,res:150}, ak:{mag:30,res:90}, m4:{mag:30,res:90}, sg552:{mag:30,res:90}, aug:{mag:30,res:90}, scout:{mag:10,res:30}, awp:{mag:5,res:30}, m249:{mag:100,res:200}};
   player.x = CT_SPAWNS[0][0]; player.z = CT_SPAWNS[0][1]; player.y = 0; player.vy = 0;
@@ -2701,7 +2784,7 @@ document.addEventListener('keydown', e=>{
   if(e.code === 'Digit1') switchWeapon(player.weapons.awp ? 'awp' : player.weapons.scout ? 'scout' : player.weapons.m249 ? 'm249' : player.weapons.sg552 ? 'sg552' : player.weapons.aug ? 'aug' : player.weapons.m4 ? 'm4' : player.weapons.ak ? 'ak' : player.weapons.p90 ? 'p90' : player.weapons.ump ? 'ump' : player.weapons.mp5 ? 'mp5' : null);
   if(e.code === 'Digit2') switchWeapon(player.weapons.deagle ? 'deagle' : player.weapons.fiveseven ? 'fiveseven' : player.weapons.glock ? 'glock' : 'usp');
   if(e.code === 'Digit3') switchWeapon('knife');
-  if(e.code === 'Digit4') switchWeapon(player.weapons.he > 0 ? 'he' : player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
+  if(e.code === 'Digit4') switchWeapon(player.weapons.he > 0 ? 'he' : player.weapons.molotov > 0 ? 'molotov' : player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
   if(e.code === 'Digit5') switchWeapon(player.weapons.smoke > 0 ? 'smoke' : player.weapons.flash > 0 ? 'flash' : null);
   if(e.code === 'Digit6') switchWeapon('flash');
   if(e.code === 'KeyE' && !player.dead && !$('buymenu').classList.contains('open')){
@@ -2814,7 +2897,7 @@ function setTeam(team){
   const s = spawns[Math.floor(Math.random()*spawns.length)];
   player.x = s[0]; player.z = s[1]; player.y = 0; player.vy = 0;
   player.health = 100; player.armor = 100; player.dead = false;
-  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, smoke:0, flash:0};
+  player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0};
   player.cur = 'usp';
   player.ammo = {usp:{mag:12,res:36}, glock:{mag:20,res:60}, fiveseven:{mag:20,res:60}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ump:{mag:25,res:75}, p90:{mag:50,res:150}, ak:{mag:30,res:90}, m4:{mag:30,res:90}, sg552:{mag:30,res:90}, aug:{mag:30,res:90}, scout:{mag:10,res:30}, awp:{mag:5,res:30}, m249:{mag:100,res:200}};
   buildViewmodel('usp');
@@ -2948,7 +3031,7 @@ function updatePlayer(dt){
       const s = player.team === 'CT' ? CT_SPAWNS : T_SPAWNS;
       const sp = s[Math.floor(Math.random()*s.length)];
       player.x = sp[0]; player.z = sp[1]; player.y = 0; player.vy = 0;
-      player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, smoke:0, flash:0};
+      player.weapons = {usp:true, glock:false, fiveseven:false, deagle:false, mp5:false, ump:false, p90:false, ak:false, m4:false, sg552:false, aug:false, scout:false, awp:false, m249:false, he:0, molotov:0, smoke:0, flash:0};
       player.cur = 'usp';
       player.ammo = {usp:{mag:12,res:36}, glock:{mag:20,res:60}, fiveseven:{mag:20,res:60}, deagle:{mag:7,res:21}, mp5:{mag:30,res:90}, ump:{mag:25,res:75}, p90:{mag:50,res:150}, ak:{mag:30,res:90}, m4:{mag:30,res:90}, sg552:{mag:30,res:90}, aug:{mag:30,res:90}, scout:{mag:10,res:30}, awp:{mag:5,res:30}, m249:{mag:100,res:200}};
       player.flashT = 0; $('flashfx').style.opacity = 0;
@@ -3470,6 +3553,7 @@ function updateFx(dt){
   particles.splice(0, particles.length, ...particles.filter(p=>p.life>0));
   updateShells(dt);
   updateSmoke(dt);
+  updateFire(dt);
   for(const n of dmgNums){
     n.life -= dt;
     n.sprite.position.y += n.vy*dt;
