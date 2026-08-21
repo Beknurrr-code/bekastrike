@@ -1392,7 +1392,7 @@ function buildBot(team, name){
     mode:'patrol', target:null, fireT:0, thinkT:rand(0,0.5),
     wp:null, wpT:0, strafeDir:1, strafeT:0, speed:4.2, crouch:0, heard:null, walkT:0,
     weapon: BOT_WEAPONS[team][Math.random()<0.6?0:1],
-    ammo:null, reloading:false, reloadT:0, flashT:0, bought:false,
+    ammo:null, reloading:false, reloadT:0, flashT:0, bought:false, flashUsed:false, heUsed:false,
     lastDamager:null, money:800, diff:DIFF[settings.diff]
   };
   bot.ammo = {mag:WEAPONS[bot.weapon].mag, res:WEAPONS[bot.weapon].reserve};
@@ -1557,6 +1557,18 @@ function botThrowFlash(b, target){
     x: b.x, y: 1.5, z: b.z,
     vx: Math.sin(ang)*spd, vy: 3.5, vz: Math.cos(ang)*spd,
     fuse: 0.9, bounced:false, live:true, kind:'flash'
+  });
+  AudioSys.tone(300,0.1,0.15,'square',-100);
+}
+// bot throws HE grenade into a cluster of enemies
+function botThrowGrenade(b, target, kind){
+  if(!target) return;
+  const ang = Math.atan2(target.x - b.x, target.z - b.z);
+  const spd = 20;
+  grenades.push({
+    x: b.x, y: 1.5, z: b.z,
+    vx: Math.sin(ang)*spd, vy: 3.5, vz: Math.cos(ang)*spd,
+    fuse: 1.1, bounced:false, live:true, kind
   });
   AudioSys.tone(300,0.1,0.15,'square',-100);
 }
@@ -2925,7 +2937,13 @@ function showVictory(){
   $('victory-title').textContent = win ? 'ПОБЕДА' : 'ПОРАЖЕНИЕ';
   $('victory-title').className = 'vt ' + (win?'win':'lose');
   const best = [...entities].sort((a,b)=>b.kills-a.kills)[0];
-  $('victory-sub').innerHTML = `Счёт: CT ${ctRounds} — ${tRounds} T · Твои убийства: ${player.kills}<br><span class="mvp">MVP: ${best.name} — ${best.kills} убийств</span>`;
+  const kd = player.deaths ? (player.kills/player.deaths).toFixed(2) : player.kills.toFixed(2);
+  $('victory-sub').innerHTML = `
+    Счёт: CT ${ctRounds} — ${tRounds} T<br>
+    <span class="vs-stats">
+      Ты: ${player.kills} фрагов · ${player.deaths} смертей · K/D <b>${kd}</b><br>
+      MVP: ${best.name} — ${best.kills} убийств
+    </span>`;
   $('victory').classList.add('show');
   document.exitPointerLock();
   if(win) AudioSys.victory(); else AudioSys.defeat();
@@ -3643,6 +3661,16 @@ function updatePlayer(dt){
     player.z += player.vz * dt;
     player.moving = true;
     player.speed = Math.hypot(player.vx, player.vz);
+    // bots hear footsteps: normal = loud, shift-walk = quiet (sneak!)
+    if(!player._stepHearT || performance.now() - player._stepHearT > 350){
+      player._stepHearT = performance.now();
+      const hearR = walking ? 12 : crouching ? 8 : 22;
+      for(const b of bots){
+        if(!b.dead && dist3(b.x,0,b.z, player.x,0,player.z) < hearR){
+          b.heard = {x:player.x, z:player.z, t:performance.now()};
+        }
+      }
+    }
   } else {
     // decelerate to a stop
     player.vx = (player.vx||0) * Math.max(0, 1 - dt*10);
@@ -3802,6 +3830,18 @@ function updateBot(b, dt){
       if(!b.flashUsed && bestD < 25 && Math.random() < flashChance){
         b.flashUsed = true;
         botThrowFlash(b, best);
+      }
+      // bot HE: throws grenade into a cluster of 2+ enemies (tactic, CS-style)
+      if(!b.heUsed && Math.random() < (b.diff===DIFF.hard ? 0.1 : 0.05)){
+        let cluster = 0;
+        for(const e of entities){
+          if(e===b || e.dead || e.team===b.team) continue;
+          if(dist3(b.x,0,b.z, e.x,0,e.z) < 10) cluster++;
+        }
+        if(cluster >= 2){
+          b.heUsed = true;
+          botThrowGrenade(b, best, 'he');
+        }
       }
     } else {
       // lost target: reset burst, reposition
@@ -4054,6 +4094,19 @@ function updateBot(b, dt){
   const moving = Math.abs(moveX)+Math.abs(moveZ) > 0.01;
   if(moving){
     b.walkT = (b.walkT||0) + dt*9;
+    // player hears bot footsteps (they're loud, CS-style)
+    if(!player.dead && b.walkT - Math.floor(b.walkT) < 0.1 && Math.random() < 0.3){
+      const bd = dist3(player.x,0,player.z, b.x,0,b.z);
+      if(bd < 16){
+        AudioSys.footstep();
+        // and nearby bots hear teammate steps too (group coordination)
+        for(const ob of bots){
+          if(ob !== b && !ob.dead && dist3(ob.x,0,ob.z, b.x,0,b.z) < 20){
+            ob.heard = {x:b.x, z:b.z, t:performance.now()};
+          }
+        }
+      }
+    }
     const s = Math.sin(b.walkT*Math.PI*2)*0.12;
     b.group.children[0].position.x = s*0.5;   // legL
     b.group.children[0].position.z = -s*0.5;
