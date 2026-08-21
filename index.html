@@ -616,7 +616,6 @@ const MAPS = {
     name:'de_dust',
     label:'Dust (пустыня)',
     bombSites:[[-22,-22],[22,-22]], // A (left) and B (right) like real de_dust
-    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -672,7 +671,6 @@ const MAPS = {
     name:'de_nuke',
     label:'Nuke (склад)',
     bombSites:[[-24,18],[24,18]], // A (left) and B (right) — nuke style
-    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -719,7 +717,6 @@ const MAPS = {
     name:'de_inferno',
     label:'Inferno (город)',
     bombSites:[[-24,-18],[-24,18]], // A and B in the houses — like real inferno
-    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -770,7 +767,6 @@ const MAPS = {
     name:'de_train',
     label:'Train (депо)',
     bombSites:[[-24,-22],[24,-22]], // A (left) and B (right) on the platforms
-    hostagePoints:[[-20,-20],[-15,-20],[-20,-15]],
     ctSpawns:[[-30,-30],[-30,-25],[-25,-30],[-25,-25]],
     tSpawns:[[30,30],[30,25],[25,30],[25,25]],
     build(){
@@ -869,7 +865,7 @@ function buildMap(name){
   CT_SPAWNS.length = 0; T_SPAWNS.length = 0;
   for(const s of m.ctSpawns) CT_SPAWNS.push(s);
   for(const s of m.tSpawns) T_SPAWNS.push(s);
-  // bomb site markers (A and B, yellow circles on the ground)
+  // bomb site markers (A and B, yellow circles + floating letters)
   BOMB_SITES.forEach((site, i) => {
     const bc = document.createElement('canvas'); bc.width = bc.height = 128;
     const bg = bc.getContext('2d');
@@ -892,6 +888,24 @@ function buildMap(name){
     mk.position.set(site[0], 0.05, site[1]);
     scene.add(mk);
     bombSiteMarkers.push(mk);
+    // floating letter sign above the site (visible from far)
+    const sc = document.createElement('canvas'); sc.width = 256; sc.height = 128;
+    const sg = sc.getContext('2d');
+    sg.fillStyle = 'rgba(0,0,0,0.6)';
+    sg.fillRect(0,0,256,128);
+    sg.strokeStyle = '#ffd24a'; sg.lineWidth = 6;
+    sg.strokeRect(3,3,250,122);
+    sg.font = 'bold 90px sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
+    sg.fillStyle = '#ffd24a';
+    sg.fillText(i===0 ? 'A' : 'B', 128, 68);
+    const st = new THREE.CanvasTexture(sc);
+    const sign = new THREE.Mesh(
+      new THREE.PlaneGeometry(3,1.5),
+      new THREE.MeshBasicMaterial({map:st, transparent:true, side:THREE.DoubleSide})
+    );
+    sign.position.set(site[0], 3.2, site[1]);
+    scene.add(sign);
+    bombSiteMarkers.push(sign);
   });
 }
 let bombSiteMarkers = [];
@@ -1233,7 +1247,8 @@ function buildHostage(x, z){
 function resetHostages(){
   for(const h of hostages){ scene.remove(h.group); }
   hostages = [];
-  const pts = MAPS[currentMap].hostagePoints || HOSTAGE_POINTS;
+  const pts = MAPS[currentMap].hostagePoints;
+  if(!pts) return; // no hostages on bomb maps (de_*) — only cs_office
   for(const p of pts) buildHostage(p[0], p[1]);
 }
 function updateHostages(dt){
@@ -1793,19 +1808,28 @@ function playerShoot(){
   const spreadA = precise ? 0.0005 : w.spread + spread;
   dir.x += rand(-spreadA, spreadA); dir.y += rand(-spreadA, spreadA); dir.z += rand(-spreadA, spreadA);
   dir.normalize();
-  const ox = player.x, oy = player.y + player.eyeH, oz = player.z;
+  // bullet starts from the gun muzzle (right-bottom of view), travels exactly to the crosshair point
+  const camPos = new THREE.Vector3(player.x, player.y + player.eyeH, player.z);
+  const aimPoint = camPos.clone().add(dir.clone().multiplyScalar(150));
+  const muzzle = new THREE.Vector3(
+    player.x + Math.cos(player.yaw)*0.28,
+    player.y + player.eyeH - 0.18,
+    player.z - Math.sin(player.yaw)*0.28
+  );
+  const shotDir = aimPoint.clone().sub(muzzle).normalize();
+  const ox = muzzle.x, oy = muzzle.y, oz = muzzle.z;
 
   let wallD = 1e9, wallHit = null;
   // wallbang: AK/AWP pierce crates (h<=2.5), with damage falloff
   const pierce = (w.kind==='ak'||w.kind==='awp') && colliders.some(b=>b.h<=2.5);
   for(const b of colliders){
-    const t = rayAABB(ox,oy,oz, dir.x,dir.y,dir.z, b);
+    const t = rayAABB(ox,oy,oz, shotDir.x,shotDir.y,shotDir.z, b);
     if(t!==null && t<wallD){ wallD = t; wallHit = b; }
   }
   if(pierce && wallHit && wallHit.h <= 2.5){
     wallD += 1.2; // pass through crate
   }
-  raycaster.set(new THREE.Vector3(ox,oy,oz), dir);
+  raycaster.set(new THREE.Vector3(ox,oy,oz), shotDir);
   raycaster.far = Math.min(w.range, wallD);
   const hits = raycaster.intersectObjects(shootTargets, false);
   let hit = null;
@@ -1816,7 +1840,7 @@ function playerShoot(){
     if(hg && !hg.dead && !hg.rescued){ hit = h; break; }
   }
   const endD = hit ? hit.distance : wallD;
-  const ex = ox + dir.x*endD, ey = oy + dir.y*endD, ez = oz + dir.z*endD;
+  const ex = ox + shotDir.x*endD, ey = oy + shotDir.y*endD, ez = oz + shotDir.z*endD;
   addTracer(ox,oy,oz, ex,ey,ez, w.kind==='usp'||w.kind==='deagle' ? 0xfff0c0 : 0xffc860);
 
   if(hit){
@@ -3121,7 +3145,7 @@ function updateBot(b, dt){
       b.reloadT = bW2.reload * 0.8;
     }
     b.group.position.set(b.x, b.y, b.z);
-    b.group.rotation.y = b.yaw;
+    b.group.rotation.y = b.yaw + Math.PI; // model faces -Z; yaw is +Z direction
     b.shadow.position.set(b.x, 0.02, b.z);
     return; // skip the rest of movement logic
   }
@@ -3293,7 +3317,7 @@ function updateBot(b, dt){
   b.x = clamp(b.x, -MAP/2+1, MAP/2-1);
   b.z = clamp(b.z, -MAP/2+1, MAP/2-1);
   b.group.position.set(b.x, b.y, b.z);
-  b.group.rotation.y = b.yaw;
+  b.group.rotation.y = b.yaw + Math.PI; // model faces -Z; yaw is +Z direction
   b.shadow.position.set(b.x, 0.02, b.z);
   // crouch visual (torso=4, head=5)
   b.group.children[4].position.y = 1.0 - b.crouch*0.2;
