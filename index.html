@@ -216,7 +216,17 @@
   .case-btn { padding:10px 22px; font-size:14px; font-weight:700; color:#111; background:linear-gradient(180deg,#ffe28a,#e0a800); border:none; border-radius:8px; cursor:pointer; box-shadow:0 3px 0 #8a6a00; transition:transform .1s; }
   .case-btn:hover { transform:translateY(-2px); }
   .case-btn:disabled { opacity:.5; cursor:default; transform:none; }
+  @keyframes caseShake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-6px) rotate(-2deg);} 40%{transform:translateX(6px) rotate(2deg);} 60%{transform:translateX(-4px);} 80%{transform:translateX(4px);} }
   .case-hint { font-size:11px; color:#8a96a4; }
+  /* Skin preview modal */
+  #skinprev { z-index:70; background:radial-gradient(ellipse at 50% 30%, rgba(20,28,44,.95), rgba(6,8,14,.98)); }
+  #skinprev .sp-wrap { max-width:520px; width:90%; background:linear-gradient(160deg, rgba(24,32,48,.95), rgba(12,16,26,.97)); border:1px solid rgba(255,255,255,.14); border-radius:16px; padding:22px 26px; box-shadow:0 24px 80px rgba(0,0,0,.85); text-align:center; }
+  #skinprev .sp-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  #skinprev .sp-name { font-size:20px; font-weight:800; color:#ffd24a; letter-spacing:1px; }
+  #skinprev .sp-stage { height:260px; background:radial-gradient(ellipse at 50% 60%, rgba(255,210,74,.06), transparent 70%); border:1px solid rgba(255,255,255,.08); border-radius:12px; position:relative; overflow:hidden; }
+  #skinprev .sp-stage canvas { position:absolute; inset:0; margin:auto; }
+  #skinprev .sp-actions { display:flex; gap:10px; justify-content:center; margin-top:14px; }
+  #skinprev .case-btn.gray { background:linear-gradient(180deg,#b4bcc4,#6a727a); box-shadow:0 3px 0 #3a4046; color:#111; }
   #buymenu { position:fixed; inset:0; z-index:40; background:rgba(5,7,10,.92); display:none; }
   #buymenu .bm-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
   #buymenu .bm-tab { pointer-events:auto; padding:6px 14px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:4px; cursor:pointer; }
@@ -518,6 +528,21 @@
   </div>
 </div>
 
+<!-- Skin preview modal (3D rotating gun) -->
+<div id="skinprev" class="overlay hidden">
+  <div class="sp-wrap">
+    <div class="sp-head">
+      <span class="sp-name" id="sp-name">AK-47 | Redline</span>
+      <button class="inv-close" id="sp-close">✕</button>
+    </div>
+    <div class="sp-stage" id="sp-stage"></div>
+    <div class="sp-actions">
+      <button class="case-btn" id="sp-equip">🎽 Надеть</button>
+      <button class="case-btn gray" id="sp-close2">Назад</button>
+    </div>
+  </div>
+</div>
+
 <!-- Quests menu -->
 <div id="questmenu" class="overlay hidden">
   <div class="inv-wrap">
@@ -676,7 +701,6 @@ const AudioSys = {
     else if(kind==='bot'){ this.noise(0.07,0.25*vol,2000); }
   },
   empty(){ this.tone(700,0.03,0.1,'square'); },
-  reload(){ this.tone(500,0.05,0.15,'square'); setTimeout(()=>this.tone(400,0.05,0.15,'square'),150); setTimeout(()=>this.tone(650,0.06,0.18,'square'),350); },
   hit(){ this.tone(1200,0.05,0.2,'sine'); },
   armor(){ this.tone(1500,0.05,0.15,'square'); this.tone(1900,0.04,0.1,'square',0,0.02); },
   headshot(){ this.tone(1600,0.08,0.25,'sine'); this.tone(2400,0.1,0.15,'sine',-200); },
@@ -687,6 +711,15 @@ const AudioSys = {
   jump(){ this.tone(200,0.1,0.1,'sine',80); },
   land(){ this.noise(0.05,0.12,400); },
   buy(){ this.tone(900,0.08,0.2,'square'); setTimeout(()=>this.tone(1200,0.1,0.2,'square'),80); },
+  reload(){ this.tone(600,0.03,0.15,'square'); setTimeout(()=>this.tone(900,0.03,0.15,'square'),150); setTimeout(()=>this.tone(500,0.04,0.15,'square'),300); },
+  ambient(kind){
+    // subtle map ambience: wind on dust/train, siren on nuke, rain-drip on inferno, office hum
+    if(!this.ctx || this.muted) return;
+    if(kind==='wind'){ this.noise(1.2, 0.03, 400, 'lowpass'); }
+    else if(kind==='siren'){ this.tone(220, 0.4, 0.02, 'sine', 60); }
+    else if(kind==='rain'){ this.noise(0.8, 0.025, 4000, 'highpass'); }
+    else if(kind==='hum'){ this.tone(110, 0.6, 0.015, 'sine'); }
+  },
   deny(){ this.tone(200,0.15,0.2,'square'); },
   hurt(){ this.tone(180,0.15,0.3,'sawtooth',-60); },
   death(){ this.tone(300,0.4,0.3,'sawtooth',-200); },
@@ -1410,8 +1443,8 @@ function buildBot(team, name){
 }
 
 const bots = [];
-for(const n of BOT_NAMES_CT) bots.push(buildBot('CT', n));
-for(const n of BOT_NAMES_T)  bots.push(buildBot('T', n));
+for(const n of BOT_NAMES_CT){ const b = buildBot('CT', n); b.botIndex = bots.length; bots.push(b); }
+for(const n of BOT_NAMES_T){ const b = buildBot('T', n); b.botIndex = bots.length; bots.push(b); }
 
 function respawnBot(b){
   const d = DIFF[settings.diff];
@@ -2098,7 +2131,15 @@ function playerShoot(){
   }
   player._lastShotT = performance.now();
   spread = Math.min(spread + w.spread*3, 0.14);
-  player.pitch += w.kind==='ak' ? 0.006 : (w.kind==='awp'||w.kind==='scout') ? 0.01 : w.kind==='m249' ? 0.008 : 0.0025;
+  // recoil pattern: AK climbs up-right (CS-style spray), AWP big kick, others small
+  if(w.kind==='ak'){
+    player.pitch += 0.006;
+    player.akSpray = (player.akSpray||0) + 1;
+    // up-right drift: first 10 shots drift right, then stabilize like CS
+    if(player.akSpray <= 10) player.yaw += 0.0022;
+  } else {
+    player.pitch += (w.kind==='awp'||w.kind==='scout') ? 0.01 : w.kind==='m249' ? 0.008 : 0.0025;
+  }
 
   // shell
   spawnShell(
@@ -2620,6 +2661,13 @@ function refreshBuyMenu(){
 function buyItem(id){
   const it = BUY_ITEMS.find(i=>i.id===id);
   if(id==='usp') return;
+  // pistol round: round 1 = pistols + armor + grenades only (CS-style)
+  const pistolRound = roundNum === 1;
+  if(pistolRound && ['mp5','ump','p90','ak','m4','sg552','aug','scout','awp','m249'].includes(id)){
+    AudioSys.deny();
+    announce('ПИСТОЛЕТНЫЙ РАУНД — только пистолеты!', null, '#8ab8ff', 1.5);
+    return;
+  }
   if(id==='skin'){
     if(player.money < it.price){ AudioSys.deny(); return; }
     player.money -= it.price;
@@ -3158,6 +3206,7 @@ function switchWeapon(w){
   if(player.cur === w) return;
   player.cur = w;
   player.reloading = false;
+  player.akSpray = 0; // reset AK recoil pattern on weapon switch (CS-style)
   buildViewmodel(w);
   switchT = 0.25;
   if(w !== 'awp') setZoom(false);
@@ -3234,12 +3283,9 @@ function buildInventory(){
     `;
     div.addEventListener('click', ()=>{
       if(isOwned){
-        // apply this skin
-        player.skinColor = s.color;
-        player.skinName = s.name;
-        announce('🎨 ' + s.name + ' — НАДЕТ!', null, '#ffd24a', 1.5);
-        buildViewmodel(player.cur);
-        AudioSys.buy();
+        // open 3D preview modal (CS2-style), equip from there
+        $('sp-equip').dataset.skinId = s.id;
+        openSkinPreview(s);
       } else if(player.credits >= s.price){
         player.credits -= s.price;
         localStorage.setItem('bekastrike_credits', player.credits);
@@ -3299,13 +3345,23 @@ function initInventoryUI(){
         buildInventory();
         return;
       }
-      for(const s of won){
-        if(!owned.includes(s.id)) owned.push(s.id);
-      }
-      saveOwned(owned);
-      announce('🎁 Из кейса: ' + won.map(s=>s.name).join(', '), null, '#ffd24a', 2.5);
-      AudioSys.tone(1400,0.2,0.3,'square');
-      buildInventory();
+      const caseBtn2 = caseBtn;
+      // case animation: button shakes briefly, then reveal
+      caseBtn2.disabled = true;
+      caseBtn2.style.animation = 'caseShake .6s';
+      AudioSys.tone(400,0.08,0.2,'square');
+      setTimeout(()=>{
+        caseBtn2.disabled = false;
+        caseBtn2.style.animation = '';
+        if(won.length === 0) return; // case-back path handled above
+        for(const s of won){
+          if(!owned.includes(s.id)) owned.push(s.id);
+        }
+        saveOwned(owned);
+        announce('🎁 Из кейса: ' + won.map(s=>s.name).join(', '), null, '#ffd24a', 2.5);
+        AudioSys.tone(1400,0.2,0.3,'square');
+        buildInventory();
+      }, 400);
     });
   }
   document.querySelectorAll('.inv-tab').forEach(t=>{
@@ -3401,6 +3457,79 @@ function initProfileUI(){
       announce('✅ Регистрация: ' + clean, null, '#7ddb6a', 2);
       AudioSys.buy();
     }
+  });
+}
+
+// ---------- skin preview (3D rotating gun) ----------
+let prevScene=null, prevCam=null, prevRenderer=null, prevGun=null, prevT=0, prevFrameId=null;
+function openSkinPreview(skin){
+  $('sp-name').textContent = skin.name;
+  $('skinprev').classList.remove('hidden');
+  const stage = $('sp-stage');
+  if(!prevScene){
+    prevScene = new THREE.Scene();
+    prevCam = new THREE.PerspectiveCamera(45, stage.clientWidth/stage.clientHeight, 0.1, 10);
+    prevCam.position.set(0, 0.4, 2.2);
+    prevCam.lookAt(0, 0, 0);
+    const amb = new THREE.AmbientLight(0xffffff, 0.7);
+    prevScene.add(amb);
+    const dl = new THREE.DirectionalLight(0xffffff, 0.9);
+    dl.position.set(1.5, 2, 2);
+    prevScene.add(dl);
+    const dl2 = new THREE.DirectionalLight(0xffd24a, 0.4);
+    dl2.position.set(-1, 1, -1);
+    prevScene.add(dl2);
+  }
+  if(!prevRenderer){
+    prevRenderer = new THREE.WebGLRenderer({alpha:true, antialias:true});
+    prevRenderer.setSize(stage.clientWidth, stage.clientHeight);
+    prevRenderer.setClearColor(0x000000, 0);
+    stage.appendChild(prevRenderer.domElement);
+  }
+  if(prevGun){
+    prevScene.remove(prevGun);
+    prevGun = null;
+  }
+  // build a stylized rifle out of boxes in the skin's color
+  const mat = new THREE.MeshLambertMaterial({color: skin.color});
+  const matD = new THREE.MeshLambertMaterial({color: 0x2a2f38});
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.16, 0.95), mat); body.position.set(0,0,0); g.add(body);
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.05, 0.55), matD); barrel.position.set(0, 0.02, -0.7); g.add(barrel);
+  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.28, 0.12), matD); mag.position.set(0, -0.2, 0.1); g.add(mag);
+  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.12, 0.3), matD); stock.position.set(0, -0.02, 0.6); g.add(stock);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.18, 0.08), matD); grip.position.set(0, -0.15, 0.42); g.add(grip);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.1), mat); sight.position.set(0, 0.12, -0.1); g.add(sight);
+  prevGun = g;
+  prevScene.add(g);
+  // spin animation
+  cancelAnimationFrame(prevFrameId);
+  const anim = ()=>{
+    prevT += 0.02;
+    if(prevGun) prevGun.rotation.y = Math.sin(prevT*0.8)*0.5 + prevT*0.4;
+    prevRenderer.render(prevScene, prevCam);
+    prevFrameId = requestAnimationFrame(anim);
+  };
+  anim();
+}
+function closeSkinPreview(){
+  $('skinprev').classList.add('hidden');
+  cancelAnimationFrame(prevFrameId);
+}
+function initSkinPreviewUI(){
+  $('sp-close').addEventListener('click', closeSkinPreview);
+  $('sp-close2').addEventListener('click', closeSkinPreview);
+  $('sp-equip').addEventListener('click', ()=>{
+    const owned = ownedSkins();
+    const id = $('sp-equip').dataset.skinId;
+    const s = SKINS.find(x=>x.id===id);
+    if(!s) return;
+    player.skinColor = s.color;
+    player.skinName = s.name;
+    announce('🎨 ' + s.name + ' — НАДЕТ!', null, '#ffd24a', 1.5);
+    buildViewmodel(player.cur);
+    AudioSys.buy();
+    closeSkinPreview();
   });
 }
 
@@ -3587,6 +3716,7 @@ buildSettingsUI($('pause-settings'));
 initInventoryUI();
 initNewMenuUI();
 initProfileUI();
+initSkinPreviewUI();
 
 // ---------- player update ----------
 var switchT = 0;
@@ -3854,7 +3984,15 @@ function updateBot(b, dt){
         b.mode = 'patrol';
         b.crouch = 0;
         if(!b.wp || dist3(b.x,0,b.z, b.wp[0],0,b.wp[1]) < 2){
-          b.wp = [rand(-35,35), rand(-35,35)];
+          // site-based patrol: CT defend sites A/B (2 each), T roam their half
+          if(BOMB_SITES.length >= 2){
+            // pick a site by bot index (stable assignment = groups form)
+            const site = BOMB_SITES[b.botIndex % 2];
+            const jitter = rand(-6,6);
+            b.wp = [site[0] + jitter, site[1] + rand(-6,6)];
+          } else {
+            b.wp = [rand(-35,35), rand(-35,35)];
+          }
         }
       }
     }
@@ -3880,8 +4018,16 @@ function updateBot(b, dt){
     if(!b.bought){
       b.bought = true;
       const buyOptions = b.team === 'CT' ? ['m4','mp5','ump','awp','scout'] : ['ak','sg552','p90','awp','scout'];
+      // pistol round: bots stay with pistols too (CS-style)
+      if(roundNum === 1){
+        // maybe buy a deagle/glock upgrade
+        if(b.money >= 700 && Math.random() < 0.3 && WEAPONS.deagle && WEAPONS.deagle.price <= b.money){
+          b.weapon = 'deagle';
+          b.ammo = {mag:7, res:21};
+        }
+      }
       // rich bots buy rifles, poor bots stay with pistol
-      if(b.money >= 2700 && Math.random() < 0.7){
+      else if(b.money >= 2700 && Math.random() < 0.7){
         const pick = buyOptions[Math.floor(Math.random()*buyOptions.length)];
         if(WEAPONS[pick] && WEAPONS[pick].price <= b.money){
           b.weapon = pick;
@@ -4671,6 +4817,14 @@ function loop(){
   }
   updateRadar(dt);
   updateHUD();
+
+  // map ambience (subtle, every ~7s, only while playing)
+  ambT = (ambT||0) - dt;
+  if(started && !player.dead && ambT <= 0){
+    ambT = 7 + Math.random()*5;
+    const am = {de_dust:'wind', de_train:'wind', de_nuke:'siren', de_inferno:'rain', cs_office:'hum'}[currentMap];
+    if(am) AudioSys.ambient(am);
+  }
 
   renderer.render(scene, camera);
 }
