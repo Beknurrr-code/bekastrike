@@ -169,8 +169,33 @@
   .inv-btn { margin-left:10px; padding:6px 14px; font-size:13px; font-weight:600; background:rgba(255,255,255,.1); color:#ffd24a; border:1px solid rgba(255,210,74,.4); border-radius:6px; cursor:pointer; }
   .inv-btn:hover { background:rgba(255,210,74,.2); }
 
-  /* ===== New main menu (CS2-style hub) ===== */
-  .mainmenu-new { max-width:680px; }
+  /* ===== CS2-style menu (left nav + right 3D preview) ===== */
+  .cs2-menu { position:relative; z-index:1; display:flex; width:min(1100px, 94vw); height:min(640px, 90vh); background:linear-gradient(160deg, rgba(18,24,36,.92), rgba(8,12,20,.96)); border:1px solid rgba(255,255,255,.12); border-radius:18px; box-shadow:0 30px 100px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter:blur(16px); overflow:hidden; animation:menuIn .4s cubic-bezier(.2,.9,.3,1.2); }
+  .cs2-left { width:300px; min-width:300px; display:flex; flex-direction:column; padding:22px 18px 16px; border-right:1px solid rgba(255,255,255,.08); background:linear-gradient(180deg, rgba(255,255,255,.03), transparent); }
+  .cs2-logo { font-size:22px; color:#ffd24a; letter-spacing:2px; margin-bottom:22px; text-shadow:0 0 20px rgba(255,210,74,.3); }
+  .cs2-logo b { font-weight:800; }
+  .cs2-logo-v { font-size:12px; color:#fff; background:rgba(255,255,255,.12); padding:2px 8px; border-radius:4px; margin-left:6px; vertical-align:middle; }
+  .cs2-nav { display:flex; flex-direction:column; gap:6px; flex:1; }
+  .cs2-btn { display:flex; align-items:center; gap:14px; padding:13px 16px; font-size:16px; font-weight:600; color:#cfd6dd; background:transparent; border:1px solid transparent; border-radius:10px; cursor:pointer; text-align:left; transition:all .15s; }
+  .cs2-btn:hover { background:rgba(255,255,255,.07); border-color:rgba(255,255,255,.12); color:#fff; transform:translateX(4px); }
+  .cs2-btn:active { transform:translateX(2px) scale(.98); }
+  .cs2-ic { font-size:20px; width:28px; text-align:center; }
+  .cs2-btn#play-btn { background:linear-gradient(180deg,#ffe28a,#e0a800); color:#111; border:none; box-shadow:0 4px 0 #8a6a00, 0 10px 30px rgba(255,210,74,.2); }
+  .cs2-btn#play-btn:hover { transform:translateY(-2px); box-shadow:0 6px 0 #8a6a00, 0 16px 40px rgba(255,210,74,.35); }
+  .cs2-prof { margin-top:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px; }
+  .cs2-prof-row { display:flex; align-items:center; gap:10px; }
+  .cs2-prof-info { flex:1; min-width:0; }
+  .cs2-prof-stats { display:flex; gap:10px; margin-top:8px; font-size:12px; color:#cfd6dd; }
+  .cs2-prof-stats b { color:#fff; }
+  .cs2-right { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; }
+  .cs2-prev-stage { width:100%; height:70%; position:relative; }
+  .cs2-prev-stage canvas { position:absolute; inset:0; margin:auto; }
+  .cs2-prev-name { font-size:26px; font-weight:800; color:#ffd24a; letter-spacing:1px; text-shadow:0 0 30px rgba(255,210,74,.3); }
+  .cs2-prev-sub { font-size:13px; color:#8a96a4; margin-top:6px; }
+  .cs2-menu .playmode, .cs2-menu .set-block { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(8,12,20,.9); backdrop-filter:blur(8px); }
+  .cs2-menu .playmode.hidden, .cs2-menu .set-block.hidden { display:none; }
+  .cs2-menu .controls { position:absolute; right:24px; bottom:20px; z-index:3; background:rgba(0,0,0,.45); padding:12px 16px; border-radius:10px; border:1px solid rgba(255,255,255,.08); }
+  .cs2-menu .hintline { position:absolute; left:24px; bottom:20px; z-index:3; }
   .prof-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; background:linear-gradient(135deg, rgba(255,210,74,.08), rgba(255,255,255,.03)); border:1px solid rgba(255,210,74,.25); border-radius:12px; padding:12px 16px; margin-top:14px; text-align:left; transition:box-shadow .3s; }
   .prof-bar:hover { box-shadow:0 0 24px rgba(255,210,74,.15); }
   .prof-left { display:flex; align-items:center; gap:12px; }
@@ -431,46 +456,47 @@
   </div>
 </div>
 
-<!-- Main menu -->
+<!-- Main menu (CS2-style: left nav + right 3D preview) -->
 <div class="overlay" id="mainmenu">
   <div class="menu-bg"></div>
-  <div class="menu mainmenu-new">
-    <div class="logo-row">💣 BekaStrike</div>
-    <div class="title">BEKASTRIKE<span class="v2">CS2</span></div>
-    <div class="subtitle">FPS в стиле Counter-Strike 2</div>
-    <!-- Profile bar -->
-    <div class="prof-bar">
-      <div class="prof-left">
-        <div class="prof-avatar" id="prof-avatar">😎</div>
-        <div class="prof-info">
-          <div class="prof-name" id="prof-name">Игрок</div>
-          <div class="prof-lvl">Ур. <b id="prof-lvl">1</b> · <span id="prof-rank">Новичок</span></div>
+  <div class="cs2-menu">
+    <!-- LEFT: vertical navigation -->
+    <div class="cs2-left">
+      <div class="cs2-logo">💣 <b>BEKASTRIKE</b><span class="cs2-logo-v">CS2</span></div>
+      <div class="cs2-nav">
+        <button class="cs2-btn" id="play-btn"><span class="cs2-ic">▶</span><span class="cs2-txt">Играть</span></button>
+        <button class="cs2-btn" id="inv-btn"><span class="cs2-ic">🎒</span><span class="cs2-txt">Инвентарь</span></button>
+        <button class="cs2-btn" id="shop-btn"><span class="cs2-ic">🛒</span><span class="cs2-txt">Магазин</span></button>
+        <button class="cs2-btn" id="loadout-btn"><span class="cs2-ic">🎽</span><span class="cs2-txt">Лодаут</span></button>
+        <button class="cs2-btn" id="market-btn"><span class="cs2-ic">📊</span><span class="cs2-txt">Рынок</span></button>
+        <button class="cs2-btn" id="quests-btn"><span class="cs2-ic">📜</span><span class="cs2-txt">Квесты</span></button>
+        <button class="cs2-btn" id="settings-btn"><span class="cs2-ic">⚙️</span><span class="cs2-txt">Настройки</span></button>
+      </div>
+      <!-- profile at bottom of left column -->
+      <div class="cs2-prof">
+        <div class="cs2-prof-row">
+          <div class="prof-avatar" id="prof-avatar">😎</div>
+          <div class="cs2-prof-info">
+            <div class="prof-name" id="prof-name">Игрок</div>
+            <div class="prof-lvl">Ур. <b id="prof-lvl">1</b> · <span id="prof-rank">Новичок</span></div>
+          </div>
+          <button class="prof-btn" id="prof-reg-btn">Регистрация</button>
+        </div>
+        <div class="xp-bar-wrap"><div class="xp-bar" id="xp-bar"><span id="xp-lbl">0/100 XP</span></div></div>
+        <div class="cs2-prof-stats">
+          <span>🎯 <b id="prof-kills">0</b></span>
+          <span>🏆 <b id="prof-wins">0</b></span>
+          <span>🪙 <b id="prof-bp">0</b></span>
         </div>
       </div>
-      <div class="prof-right">
-        <div class="prof-stat">🎯 <b id="prof-kills">0</b></div>
-        <div class="prof-stat">🏆 <b id="prof-wins">0</b></div>
-        <div class="prof-stat">🪙 <b id="prof-bp">0</b></div>
-        <button class="prof-btn" id="prof-reg-btn">Регистрация</button>
-      </div>
     </div>
-    <!-- XP bar -->
-    <div class="xp-bar-wrap">
-      <div class="xp-bar" id="xp-bar"><span id="xp-lbl">0/100 XP</span></div>
+    <!-- RIGHT: 3D weapon preview -->
+    <div class="cs2-right">
+      <div class="cs2-prev-stage" id="cs2-prev-stage"></div>
+      <div class="cs2-prev-name" id="cs2-prev-name">AK-47 | Redline</div>
+      <div class="cs2-prev-sub" id="cs2-prev-sub">Твой скин · кликни в инвентаре, чтобы сменить</div>
     </div>
-    <!-- Main buttons -->
-    <div class="main-btns">
-      <button class="btn big" id="play-btn">▶ ИГРАТЬ</button>
-      <div class="btn-grid">
-        <button class="btn gray grid-btn" id="inv-btn">🎒 Инвентарь</button>
-        <button class="btn gray grid-btn" id="shop-btn">🛒 Магазин</button>
-        <button class="btn gray grid-btn" id="loadout-btn">🎽 Лодаут</button>
-        <button class="btn gray grid-btn" id="market-btn">📊 Рынок</button>
-        <button class="btn gray grid-btn" id="quests-btn">📜 Квесты</button>
-        <button class="btn gray grid-btn" id="settings-btn">⚙️ Настройки</button>
-      </div>
-    </div>
-    <!-- play mode selector (bots / multiplayer) -->
+    <!-- play mode selector (overlay on top) -->
     <div class="playmode hidden" id="playmode">
       <div class="pm-title">Выбери режим</div>
       <button class="btn" id="pm-bots">🤖 С ботами</button>
@@ -488,7 +514,7 @@
       <div class="set-row"><span>Сложность</span><span class="diff-btns"><button class="diff-btn" data-diff="easy">Лёгкая</button><button class="diff-btn" data-diff="medium">Средняя</button><button class="diff-btn" data-diff="hard">Сложная</button></span></div>
       <button class="btn small gray" id="settings-back" style="margin-top:12px">← Назад</button>
     </div>
-    <div class="controls">
+    <div class="controls hidden" id="menu-controls">
       <span><b>W A S D</b></span><span>движение</span>
       <span><b>Мышь</b></span><span>прицел / стрельба</span>
       <span><b>ПКМ</b></span><span>зум AWP / нож</span>
@@ -503,7 +529,7 @@
       <span><b>Tab</b></span><span>счёт</span>
       <span><b>M</b></span><span>звук вкл/выкл</span>
     </div>
-    <div class="hintline">Команда CT против террористов. До 16 раундов. Удачи, Beknur!</div>
+    <div class="hintline hidden" id="menu-hint">Команда CT против террористов. До 16 раундов. Удачи, Beknur!</div>
   </div>
 </div>
 
@@ -3528,6 +3554,7 @@ function initSkinPreviewUI(){
     player.skinName = s.name;
     announce('🎨 ' + s.name + ' — НАДЕТ!', null, '#ffd24a', 1.5);
     buildViewmodel(player.cur);
+    updateMenuPreviewSkin();
     AudioSys.buy();
     closeSkinPreview();
   });
@@ -3619,16 +3646,71 @@ function openMarket(){
   $('marketmenu').classList.remove('hidden');
 }
 
-// ---------- new menu wiring ----------
+// ---------- menu 3D preview (CS2-style: gun spins on the right) ----------
+let menuPrevScene=null, menuPrevCam=null, menuPrevGun=null, menuPrevT=0, menuPrevFrame=null;
+function buildMenuGun(color){
+  const mat = new THREE.MeshLambertMaterial({color});
+  const matD = new THREE.MeshLambertMaterial({color:0x2a2f38});
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.18,1.1), mat); body.position.set(0,0,0); g.add(body);
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.045,0.055,0.6), matD); barrel.position.set(0,0.02,-0.8); g.add(barrel);
+  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.055,0.3,0.14), matD); mag.position.set(0,-0.22,0.12); g.add(mag);
+  const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.13,0.35), matD); stock.position.set(0,-0.02,0.7); g.add(stock);
+  const grip = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.2,0.09), matD); grip.position.set(0,-0.16,0.48); g.add(grip);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.06,0.12), mat); sight.position.set(0,0.14,-0.12); g.add(sight);
+  return g;
+}
+function initMenuPreview(){
+  const stage = $('cs2-prev-stage');
+  if(!stage) return;
+  menuPrevScene = new THREE.Scene();
+  menuPrevCam = new THREE.PerspectiveCamera(40, stage.clientWidth/stage.clientHeight, 0.1, 10);
+  menuPrevCam.position.set(0, 0.5, 2.6);
+  menuPrevCam.lookAt(0, 0, 0);
+  const amb = new THREE.AmbientLight(0xffffff, 0.75);
+  menuPrevScene.add(amb);
+  const dl = new THREE.DirectionalLight(0xffffff, 1);
+  dl.position.set(1.5, 2.5, 2);
+  menuPrevScene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0xffd24a, 0.5);
+  dl2.position.set(-1.5, 1, -1.5);
+  menuPrevScene.add(dl2);
+  const r = new THREE.WebGLRenderer({alpha:true, antialias:true});
+  r.setSize(stage.clientWidth, stage.clientHeight);
+  r.setClearColor(0x000000, 0);
+  stage.appendChild(r.domElement);
+  const skin = SKINS.find(s=>s.id==='redline') || SKINS[0];
+  menuPrevGun = buildMenuGun(skin.color);
+  menuPrevScene.add(menuPrevGun);
+  $('cs2-prev-name').textContent = skin.name;
+  const anim = ()=>{
+    menuPrevT += 0.02;
+    if(menuPrevGun) menuPrevGun.rotation.y = Math.sin(menuPrevT*0.7)*0.4 + menuPrevT*0.5;
+    r.render(menuPrevScene, menuPrevCam);
+    menuPrevFrame = requestAnimationFrame(anim);
+  };
+  anim();
+}
+function updateMenuPreviewSkin(){
+  // show currently equipped skin (or first owned)
+  const owned = ownedSkins();
+  let skin = SKINS.find(s=>s.id===owned[owned.length-1]);
+  if(!skin) skin = SKINS[0];
+  if(menuPrevScene && menuPrevGun){
+    menuPrevScene.remove(menuPrevGun);
+    menuPrevGun = buildMenuGun(skin.color);
+    menuPrevScene.add(menuPrevGun);
+  }
+  const nm = $('cs2-prev-name');
+  if(nm) nm.textContent = skin.name;
+}
 let menuView = 'main';
 function showMenuView(v){
   menuView = v;
-  const mainBtns = document.querySelector('.main-btns');
   const playmode = $('playmode');
   const settingsBlock = $('menu-settings-block');
-  const controls = document.querySelector('.controls');
-  const hint = document.querySelector('.hintline');
-  mainBtns.classList.toggle('hidden', v !== 'main');
+  const controls = $('menu-controls');
+  const hint = $('menu-hint');
   playmode.classList.toggle('hidden', v !== 'playmode');
   settingsBlock.classList.toggle('hidden', v !== 'settings');
   controls.classList.toggle('hidden', v !== 'main');
@@ -3717,6 +3799,7 @@ initInventoryUI();
 initNewMenuUI();
 initProfileUI();
 initSkinPreviewUI();
+initMenuPreview();
 
 // ---------- player update ----------
 var switchT = 0;
