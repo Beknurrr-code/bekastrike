@@ -211,6 +211,12 @@
   .q-reward { font-size:12px; color:#ffd24a; margin-top:8px; font-weight:600; }
   .market-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px; }
   #questmenu,#marketmenu { z-index:60; background:radial-gradient(ellipse at 50% 30%, rgba(30,40,60,.9), rgba(8,10,14,.97)); }
+  /* Case opening */
+  .case-row { display:flex; align-items:center; gap:12px; justify-content:center; margin-bottom:14px; flex-wrap:wrap; }
+  .case-btn { padding:10px 22px; font-size:14px; font-weight:700; color:#111; background:linear-gradient(180deg,#ffe28a,#e0a800); border:none; border-radius:8px; cursor:pointer; box-shadow:0 3px 0 #8a6a00; transition:transform .1s; }
+  .case-btn:hover { transform:translateY(-2px); }
+  .case-btn:disabled { opacity:.5; cursor:default; transform:none; }
+  .case-hint { font-size:11px; color:#8a96a4; }
   #buymenu { position:fixed; inset:0; z-index:40; background:rgba(5,7,10,.92); display:none; }
   #buymenu .bm-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
   #buymenu .bm-tab { pointer-events:auto; padding:6px 14px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:4px; cursor:pointer; }
@@ -502,6 +508,10 @@
     <div class="inv-tabs">
       <button class="inv-tab on" data-tab="owned">Мои скины</button>
       <button class="inv-tab" data-tab="shop">Магазин скинов</button>
+    </div>
+    <div class="case-row">
+      <button class="case-btn" id="case-btn">🎁 Открыть кейс (25 BP)</button>
+      <span class="case-hint">Шанс: 50% скин · 25% 2 скина · 25% кейс обратно</span>
     </div>
     <div class="inv-grid" id="inv-grid"></div>
     <div class="inv-hint">Скины применяются к оружию в игре. Кредиты за убийства (+5) и победы (+25).</div>
@@ -1535,6 +1545,18 @@ function throwGrenade(kind, cookT){
     x: player.x, y: player.y + player.eyeH - 0.2, z: player.z,
     vx: dir.x*spd, vy: dir.y*spd + 4, vz: dir.z*spd,
     fuse: Math.max(0.1, 2.5 - (cookT||0)), bounced:false, live:true, kind
+  });
+  AudioSys.tone(300,0.1,0.15,'square',-100);
+}
+// bot throws a flashbang toward its target (blind chance for anyone in radius)
+function botThrowFlash(b, target){
+  if(!target) return;
+  const ang = Math.atan2(target.x - b.x, target.z - b.z);
+  const spd = 18;
+  grenades.push({
+    x: b.x, y: 1.5, z: b.z,
+    vx: Math.sin(ang)*spd, vy: 3.5, vz: Math.cos(ang)*spd,
+    fuse: 0.9, bounced:false, live:true, kind:'flash'
   });
   AudioSys.tone(300,0.1,0.15,'square',-100);
 }
@@ -2764,6 +2786,9 @@ function resetMatch(){
   player.flashT = 0; $('flashfx').style.opacity = 0;
   player.cookT = 0;
   player.hasBomb = false;
+  // reset per-match quest progress (5 kills in one match)
+  const qKills = quests.find(q=>q.id==='q1');
+  if(qKills && !qKills.done){ qKills.got = 0; saveQuests(); }
   for(const b of bots) respawnBot(b);
   for(const p of pickups){ p.life = 0; scene.remove(p.sprite); }
   pickups.length = 0;
@@ -2926,6 +2951,9 @@ function resetMatch(){
   player.x = CT_SPAWNS[0][0]; player.z = CT_SPAWNS[0][1]; player.y = 0; player.vy = 0;
   player.flashT = 0; $('flashfx').style.opacity = 0;
   player.cookT = 0;
+  // reset per-match quest progress (5 kills in one match)
+  const qKills2 = quests.find(q=>q.id==='q1');
+  if(qKills2 && !qKills2.done){ qKills2.got = 0; saveQuests(); }
   for(const b of bots) respawnBot(b);
   for(const p of pickups){ p.life = 0; scene.remove(p.sprite); }
   pickups.length = 0;
@@ -3222,6 +3250,46 @@ function initInventoryUI(){
     menu.classList.remove('hidden');
   });
   close.addEventListener('click', ()=>menu.classList.add('hidden'));
+  // case opening (CS2-style lootbox)
+  const caseBtn = $('case-btn');
+  if(caseBtn){
+    caseBtn.addEventListener('click', ()=>{
+      if(profile.bp < 25){ announce('НЕ ХВАТАЕТ BP! Нужно 25', null, '#ff5a4a', 1.5); AudioSys.deny(); return; }
+      profile.bp -= 25;
+      saveProfile(profile);
+      refreshMenuProfile();
+      // loot roll
+      const owned = ownedSkins();
+      const roll = Math.random();
+      const pool = SKINS.filter(s=>!owned.includes(s.id));
+      const prizePool = pool.length ? pool : SKINS;
+      let won = [];
+      if(roll < 0.5){
+        // 50%: one random skin
+        const s = prizePool[Math.floor(Math.random()*prizePool.length)];
+        won.push(s);
+      } else if(roll < 0.75){
+        // 25%: two skins
+        const shuffled = [...prizePool].sort(()=>Math.random()-0.5);
+        won.push(shuffled[0], shuffled[1]);
+      } else {
+        // 25%: case back + bonus BP
+        profile.bp += 35;
+        saveProfile(profile);
+        announce('🎁 Кейс вернулся! +35 BP (25 + 10 бонус)', null, '#8ab8ff', 2);
+        AudioSys.buy();
+        buildInventory();
+        return;
+      }
+      for(const s of won){
+        if(!owned.includes(s.id)) owned.push(s.id);
+      }
+      saveOwned(owned);
+      announce('🎁 Из кейса: ' + won.map(s=>s.name).join(', '), null, '#ffd24a', 2.5);
+      AudioSys.tone(1400,0.2,0.3,'square');
+      buildInventory();
+    });
+  }
   document.querySelectorAll('.inv-tab').forEach(t=>{
     t.addEventListener('click', ()=>{
       invTab = t.dataset.tab;
@@ -3275,6 +3343,17 @@ function refreshMenuProfile(){
 }
 function initProfileUI(){
   refreshMenuProfile();
+  // daily bonus (once per day)
+  const today = new Date().toDateString();
+  if(profile.lastBonus !== today){
+    profile.lastBonus = today;
+    profile.bp += 15;
+    saveProfile(profile);
+    setTimeout(()=>{
+      announce('🎁 Ежедневный бонус: +15 BP!', null, '#8ab8ff', 2.5);
+      refreshMenuProfile();
+    }, 800);
+  }
   // animate menu aurora background (CSS vars drift)
   let bgT = 0;
   setInterval(()=>{
@@ -3718,6 +3797,12 @@ function updateBot(b, dt){
       b.strafeT = rand(0.5, 1.5);
       b.strafeDir = Math.random()<0.5?-1:1;
       b.crouch = 0; // no crouch-jitter in combat (head stays up)
+      // bot flashbang: chance to flash the target on first contact (harder diff = smarter)
+      const flashChance = b.diff === DIFF.hard ? 0.14 : b.diff === DIFF.medium ? 0.08 : 0.03;
+      if(!b.flashUsed && bestD < 25 && Math.random() < flashChance){
+        b.flashUsed = true;
+        botThrowFlash(b, best);
+      }
     } else {
       // lost target: reset burst, reposition
       b.burstCount = 0;
