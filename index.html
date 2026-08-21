@@ -162,6 +162,28 @@
   .credits-row b { color:#ffd24a; font-size:18px; }
   .inv-btn { margin-left:10px; padding:6px 14px; font-size:13px; font-weight:600; background:rgba(255,255,255,.1); color:#ffd24a; border:1px solid rgba(255,210,74,.4); border-radius:6px; cursor:pointer; }
   .inv-btn:hover { background:rgba(255,210,74,.2); }
+
+  /* ===== New main menu (CS2-style hub) ===== */
+  .mainmenu-new { max-width:640px; }
+  .prof-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:10px; padding:10px 14px; margin-top:14px; text-align:left; }
+  .prof-left { display:flex; align-items:center; gap:10px; }
+  .prof-avatar { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#ffd24a,#c89200); display:flex; align-items:center; justify-content:center; font-size:22px; box-shadow:0 0 12px rgba(255,210,74,.3); }
+  .prof-name { font-size:15px; font-weight:700; color:#fff; }
+  .prof-lvl { font-size:12px; color:#9fb0c0; }
+  .prof-lvl b { color:#ffd24a; }
+  .prof-right { display:flex; align-items:center; gap:12px; }
+  .prof-stat { font-size:12px; color:#cfd6dd; }
+  .prof-stat b { color:#fff; font-size:14px; }
+  .prof-btn { padding:5px 12px; font-size:12px; font-weight:600; color:#ffd24a; background:rgba(255,210,74,.12); border:1px solid rgba(255,210,74,.4); border-radius:6px; cursor:pointer; }
+  .prof-btn:hover { background:rgba(255,210,74,.25); }
+  .xp-bar-wrap { margin-top:10px; height:18px; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.12); border-radius:9px; overflow:hidden; }
+  .xp-bar { height:100%; width:0%; background:linear-gradient(90deg,#4ac2ff,#8a6aff); transition:width .5s; display:flex; align-items:center; justify-content:center; }
+  .xp-bar span { font-size:10px; font-weight:700; color:#fff; text-shadow:0 1px 2px #000; }
+  .btn-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; }
+  .btn.grid-btn { margin:0; padding:12px 8px; font-size:13px; border-radius:8px; }
+  .playmode { margin-top:16px; }
+  .pm-title { color:#ffd24a; font-size:14px; letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; }
+  .hidden { display:none !important; }
   #buymenu { position:fixed; inset:0; z-index:40; background:rgba(5,7,10,.92); display:none; }
   #buymenu .bm-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; justify-content:center; }
   #buymenu .bm-tab { pointer-events:auto; padding:6px 14px; font-size:13px; font-weight:600; color:#cfd6dd; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:4px; cursor:pointer; }
@@ -368,23 +390,50 @@
 
 <!-- Main menu -->
 <div class="overlay" id="mainmenu">
-  <div class="menu">
+  <div class="menu mainmenu-new">
     <div class="logo-row">💣 BekaStrike</div>
     <div class="title">BEKASTRIKE<span class="v2">CS2</span></div>
     <div class="subtitle">FPS в стиле Counter-Strike 2</div>
-    <div class="credits-row">🪙 Кредиты: <b id="menu-credits">0</b> <button class="inv-btn" id="inv-btn">🎒 Инвентарь</button></div>
-    <button class="btn" id="play-btn">▶ ИГРАТЬ</button>
-    <button class="btn gray" id="mp-btn" style="margin-top:10px">🌐 МУЛЬТИПЛЕЕР</button>
-    <div class="team-switch" style="margin-top:12px">
-      <button class="btn small" id="team-ct-btn" style="background:linear-gradient(#4a8ac2,#2f6db5); color:#fff; box-shadow:0 3px 0 #1c3f5e">CT</button>
-      <button class="btn small gray" id="team-t-btn">T</button>
+    <!-- Profile bar -->
+    <div class="prof-bar">
+      <div class="prof-left">
+        <div class="prof-avatar" id="prof-avatar">😎</div>
+        <div class="prof-info">
+          <div class="prof-name" id="prof-name">Игрок</div>
+          <div class="prof-lvl">Ур. <b id="prof-lvl">1</b> · <span id="prof-rank">Новичок</span></div>
+        </div>
+      </div>
+      <div class="prof-right">
+        <div class="prof-stat">🎯 <b id="prof-kills">0</b></div>
+        <div class="prof-stat">🏆 <b id="prof-wins">0</b></div>
+        <div class="prof-stat">🪙 <b id="prof-bp">0</b></div>
+        <button class="prof-btn" id="prof-reg-btn">Регистрация</button>
+      </div>
     </div>
-    <div class="map-switch" style="margin-top:12px">
-      <button class="btn small gray" id="map-prev">◀</button>
-      <span class="map-name" id="map-name">Dust (пустыня)</span>
-      <button class="btn small gray" id="map-next">▶</button>
+    <!-- XP bar -->
+    <div class="xp-bar-wrap">
+      <div class="xp-bar" id="xp-bar"><span id="xp-lbl">0/100 XP</span></div>
     </div>
-    <div class="set-block" id="menu-settings">
+    <!-- Main buttons -->
+    <div class="main-btns">
+      <button class="btn big" id="play-btn">▶ ИГРАТЬ</button>
+      <div class="btn-grid">
+        <button class="btn gray grid-btn" id="inv-btn">🎒 Инвентарь</button>
+        <button class="btn gray grid-btn" id="shop-btn">🛒 Магазин</button>
+        <button class="btn gray grid-btn" id="loadout-btn">🎽 Лодаут</button>
+        <button class="btn gray grid-btn" id="market-btn">📊 Рынок</button>
+        <button class="btn gray grid-btn" id="quests-btn">📜 Квесты</button>
+        <button class="btn gray grid-btn" id="settings-btn">⚙️ Настройки</button>
+      </div>
+    </div>
+    <!-- play mode selector (bots / multiplayer) -->
+    <div class="playmode hidden" id="playmode">
+      <div class="pm-title">Выбери режим</div>
+      <button class="btn" id="pm-bots">🤖 С ботами</button>
+      <button class="btn gray" id="pm-mp">🌐 Мультиплеер</button>
+      <button class="btn small gray" id="pm-back">← Назад</button>
+    </div>
+    <div class="set-block hidden" id="menu-settings-block">
       <div class="set-title">Настройки</div>
       <div class="set-row"><span>Чувствительность</span><input type="range" class="set-sens" min="0.2" max="3" step="0.1"></div>
       <div class="set-row"><span>Поле зрения (FOV)</span><input type="range" class="set-fov" min="60" max="110" step="1"></div>
@@ -393,6 +442,7 @@
       <div class="set-row"><span>Инверсия X</span><input type="checkbox" class="set-invx"></div>
       <div class="set-row"><span>Инверсия Y</span><input type="checkbox" class="set-invy"></div>
       <div class="set-row"><span>Сложность</span><span class="diff-btns"><button class="diff-btn" data-diff="easy">Лёгкая</button><button class="diff-btn" data-diff="medium">Средняя</button><button class="diff-btn" data-diff="hard">Сложная</button></span></div>
+      <button class="btn small gray" id="settings-back" style="margin-top:12px">← Назад</button>
     </div>
     <div class="controls">
       <span><b>W A S D</b></span><span>движение</span>
@@ -1741,6 +1791,8 @@ function killEntity(e, attacker, weaponName, weaponKind, part){
     if(attacker === player){
       player.money += 300;
       player.credits = (player.credits||0) + 5; // CS2-style credits for kills
+      profile.kills++;
+      addXP(15); // +15 XP per kill
       AudioSys.kill();
       hitMarker(true);
     }
@@ -2779,6 +2831,9 @@ function showVictory(){
   player.credits = (player.credits||0) + (win ? 25 : 10);
   localStorage.setItem('bekastrike_credits', player.credits);
   refreshMenuCredits();
+  // XP: +100 for win, +40 for loss
+  profile.wins += win ? 1 : 0;
+  addXP(win ? 100 : 40);
 }
 function resetMatch(){
   matchOver = false; matchWinner = null;
@@ -2920,19 +2975,7 @@ document.addEventListener('pointerlockchange', ()=>{
     $('pause').classList.remove('show');
   }
 });
-$('play-btn').addEventListener('click', ()=>{
-  AudioSys.init(); AudioSys.resume();
-  buildMap(mapKeys[mapIdx]); // apply selected map
-  $('mainmenu').classList.add('hidden');
-  $('hud').style.display = 'block';
-  started = true;
-  vmGroup.visible = true; // show weapon in game
-  camera.rotation.order = 'YXZ'; // reset camera rotation order after menu
-  resetMatch();
-  startRound();
-  renderer.domElement.requestPointerLock();
-  AudioSys.round();
-});
+// (play-btn теперь управляется initNewMenuUI: ИГРАТЬ → выбор режима)
 function setTeam(team){
   player.team = team;
   // update team buttons
@@ -2958,24 +3001,13 @@ function setTeam(team){
   $('death').classList.remove('show');
   AudioSys.tone(600,0.1,0.15,'square');
 }
-$('team-ct-btn').addEventListener('click', ()=>setTeam('CT'));
-$('team-t-btn').addEventListener('click', ()=>setTeam('T'));
-// map selection
+// map selection (buttons moved into playmode view — wired in initNewMenuUI)
 const mapKeys = Object.keys(MAPS);
 let mapIdx = 0;
 function updateMapLabel(){
-  $('map-name').textContent = MAPS[mapKeys[mapIdx]].label;
+  const el = $('map-name');
+  if(el) el.textContent = MAPS[mapKeys[mapIdx]].label;
 }
-$('map-prev').addEventListener('click', ()=>{
-  mapIdx = (mapIdx - 1 + mapKeys.length) % mapKeys.length;
-  updateMapLabel();
-  AudioSys.tone(500,0.05,0.1,'square');
-});
-$('map-next').addEventListener('click', ()=>{
-  mapIdx = (mapIdx + 1) % mapKeys.length;
-  updateMapLabel();
-  AudioSys.tone(500,0.05,0.1,'square');
-});
 $('restart-btn').addEventListener('click', restartMatch);
 $('nextmap-btn').addEventListener('click', ()=>{
   // next random map
@@ -3121,6 +3153,130 @@ function initInventoryUI(){
   refreshMenuCredits();
 }
 
+// ---------- profile (XP / level / BP) ----------
+const RANKS = ['Новичок','Боец','Ветеран','Элита','Мастер','Легенда','Глобал'];
+function xpForLevel(l){ return 100 * l; }
+function loadProfile(){
+  try{ return Object.assign({name:'Игрок', xp:0, level:1, bp:0, kills:0, wins:0, registered:false}, JSON.parse(localStorage.getItem('bekastrike_profile')||'{}')); }
+  catch(e){ return {name:'Игрок', xp:0, level:1, bp:0, kills:0, wins:0, registered:false}; }
+}
+function saveProfile(p){ localStorage.setItem('bekastrike_profile', JSON.stringify(p)); }
+let profile = loadProfile();
+function addXP(n){
+  profile.xp += n;
+  let lvl = profile.level;
+  while(profile.xp >= xpForLevel(lvl)){ profile.xp -= xpForLevel(lvl); lvl++; }
+  if(lvl > profile.level){
+    profile.level = lvl;
+    profile.bp += 20; // level-up reward
+    announce('⬆ УРОВЕНЬ ' + lvl + '! +20 BP', null, '#8a6aff', 2);
+  }
+  profile.bp += Math.floor(n/10); // BP for XP (1 BP per 10 XP)
+  saveProfile(profile);
+  refreshMenuProfile();
+}
+function refreshMenuProfile(){
+  const el = id=>document.getElementById(id);
+  const nameEl = el('prof-name'), lvlEl = el('prof-lvl'), rankEl = el('prof-rank'),
+        killsEl = el('prof-kills'), winsEl = el('prof-wins'), bpEl = el('prof-bp'),
+        xpBar = el('xp-bar'), xpLbl = el('xp-lbl'), regBtn = el('prof-reg-btn');
+  if(nameEl) nameEl.textContent = profile.name;
+  if(lvlEl) lvlEl.textContent = profile.level;
+  if(rankEl) rankEl.textContent = RANKS[Math.min(RANKS.length-1, Math.floor(profile.level/3))];
+  if(killsEl) killsEl.textContent = profile.kills;
+  if(winsEl) winsEl.textContent = profile.wins;
+  if(bpEl) bpEl.textContent = profile.bp;
+  if(xpBar){
+    const need = xpForLevel(profile.level);
+    xpBar.style.width = Math.min(100, profile.xp/need*100) + '%';
+  }
+  if(xpLbl) xpLbl.textContent = profile.xp + '/' + xpForLevel(profile.level) + ' XP';
+  if(regBtn) regBtn.textContent = profile.registered ? '✔ ' + profile.name : 'Регистрация';
+  const mc = el('menu-credits'); if(mc) mc.textContent = profile.bp;
+}
+function initProfileUI(){
+  refreshMenuProfile();
+  $('prof-reg-btn').addEventListener('click', ()=>{
+    if(profile.registered){
+      announce('Ты уже зарегистрирован: ' + profile.name, null, '#ffd24a', 1.5);
+      return;
+    }
+    const nm = prompt('Введи ник для регистрации (без регистрации тоже можно играть):') || '';
+    const clean = nm.trim().slice(0,16);
+    if(clean){
+      profile.name = clean;
+      profile.registered = true;
+      player.name = clean;
+      saveProfile(profile);
+      refreshMenuProfile();
+      announce('✅ Регистрация: ' + clean, null, '#7ddb6a', 2);
+      AudioSys.buy();
+    }
+  });
+}
+
+// ---------- new menu wiring ----------
+let menuView = 'main';
+function showMenuView(v){
+  menuView = v;
+  const mainBtns = document.querySelector('.main-btns');
+  const playmode = $('playmode');
+  const settingsBlock = $('menu-settings-block');
+  const controls = document.querySelector('.controls');
+  const hint = document.querySelector('.hintline');
+  mainBtns.classList.toggle('hidden', v !== 'main');
+  playmode.classList.toggle('hidden', v !== 'playmode');
+  settingsBlock.classList.toggle('hidden', v !== 'settings');
+  controls.classList.toggle('hidden', v !== 'main');
+  hint.classList.toggle('hidden', v !== 'main');
+}
+function initNewMenuUI(){
+  $('play-btn').addEventListener('click', ()=>showMenuView('playmode'));
+  $('pm-bots').addEventListener('click', startBotsGame);
+  $('pm-mp').addEventListener('click', openLobby);
+  $('pm-back').addEventListener('click', ()=>showMenuView('main'));
+  $('settings-btn').addEventListener('click', ()=>showMenuView('settings'));
+  $('settings-back').addEventListener('click', ()=>showMenuView('main'));
+  $('shop-btn').addEventListener('click', ()=>{
+    invTab = 'shop';
+    document.querySelectorAll('.inv-tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='shop'));
+    buildInventory();
+    $('invmenu').classList.remove('hidden');
+  });
+  $('loadout-btn').addEventListener('click', ()=>{
+    // loadout = choose your skin to wear
+    invTab = 'owned';
+    document.querySelectorAll('.inv-tab').forEach(t=>t.classList.toggle('on', t.dataset.tab==='owned'));
+    buildInventory();
+    $('invmenu').classList.remove('hidden');
+  });
+  $('market-btn').addEventListener('click', ()=>{
+    announce('📊 Рынок скоро! Пока продаём скины за BP — скоро добавлю.', null, '#9dff9d', 2);
+  });
+  $('quests-btn').addEventListener('click', ()=>{
+    announce('📜 Квесты: сделай 5 килов в одном матче → +30 XP', null, '#8ab8ff', 2.5);
+  });
+  // map + team controls were in old menu — move map switch into playmode
+  const mapRow = document.createElement('div');
+  mapRow.className = 'team-switch';
+  mapRow.style.marginTop = '10px';
+  mapRow.innerHTML = '<button class="btn small gray" id="map-prev">◀</button><span class="map-name" id="map-name">Dust (пустыня)</span><button class="btn small gray" id="map-next">▶</button>';
+  $('playmode').appendChild(mapRow);
+  $('map-prev').addEventListener('click', ()=>{ mapIdx = (mapIdx+mapKeys.length-1)%mapKeys.length; $('map-name').textContent = MAPS[mapKeys[mapIdx]].label; });
+  $('map-next').addEventListener('click', ()=>{ mapIdx = (mapIdx+1)%mapKeys.length; $('map-name').textContent = MAPS[mapKeys[mapIdx]].label; });
+}
+function startBotsGame(){
+  AudioSys.init(); AudioSys.resume();
+  buildMap(mapKeys[mapIdx]);
+  $('mainmenu').classList.add('hidden');
+  $('hud').style.display = 'block';
+  started = true;
+  vmGroup.visible = true;
+  setZoom(false);
+  resetMatch();
+  renderer.domElement.requestPointerLock();
+}
+
 // ---------- settings UI ----------
 function buildSettingsUI(root){
   const sens = root.querySelector('.set-sens');
@@ -3153,9 +3309,11 @@ function buildSettingsUI(root){
   invx.onchange = ()=>{ settings.invX = invx.checked; saveSettings(); };
   invy.onchange = ()=>{ settings.invY = invy.checked; saveSettings(); };
 }
-buildSettingsUI($('menu-settings'));
+buildSettingsUI($('menu-settings-block'));
 buildSettingsUI($('pause-settings'));
 initInventoryUI();
+initNewMenuUI();
+initProfileUI();
 
 // ---------- player update ----------
 var switchT = 0;
@@ -4067,7 +4225,6 @@ function startMultiplayerMatch(){
 }
 
 // ---- lobby wiring ----
-$('mp-btn').addEventListener('click', openLobby);
 $('lb-back').addEventListener('click', closeLobby);
 $('lb-host').addEventListener('click', lbHost);
 $('lb-join').addEventListener('click', lbJoin);
