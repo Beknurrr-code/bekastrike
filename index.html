@@ -1117,7 +1117,10 @@ const BOT_WEAPONS = { CT:['mp5','usp','m4','ump'], T:['ak','mp5','sg552','p90'] 
 
 function buildBot(team, name){
   const g = new THREE.Group();
-  const skin = new THREE.MeshLambertMaterial({color:0xd8a878});
+  // varied skin tones per bot
+  const skinTones = [0xd8a878, 0xc8905a, 0xa07858, 0x8a6a50, 0xe0b890];
+  const tone = skinTones[Math.abs(name.charCodeAt(0)) % skinTones.length];
+  const skin = new THREE.MeshLambertMaterial({color:tone});
   const skinDark = new THREE.MeshLambertMaterial({color:0xb08a5e});
   const pants = new THREE.MeshLambertMaterial({color:0x3a3a40});
   const shirt = new THREE.MeshLambertMaterial({color: team==='CT' ? 0x3a6ea5 : 0xb08d57});
@@ -1138,11 +1141,24 @@ function buildBot(team, name){
   const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.45,0.14), shirt); armR.position.set(0.32,1.02,0);
   const handL = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.12), skin); handL.position.set(-0.32,0.75,0);
   const handR = new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,0.12), skin); handR.position.set(0.32,0.75,0);
-  // gun with barrel
+  // gun with barrel and magazine
   const gun = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.1,0.5), dark); gun.position.set(0.3,1.15,-0.3);
   const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.04,0.25), dark); barrel.position.set(0.3,1.15,-0.55);
-  [legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel].forEach(m=>m.castShadow = true);
-  g.add(legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel);
+  const mag = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.12,0.06), dark); mag.position.set(0.3,1.05,-0.3);
+  // team headgear: CT helmet / T bandana
+  let hat = null, backpack = null;
+  if(team === 'CT'){
+    hat = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.12,0.32), new THREE.MeshLambertMaterial({color:0x2a4a6a}));
+    hat.position.y = 1.68;
+  } else {
+    hat = new THREE.Mesh(new THREE.BoxGeometry(0.26,0.08,0.26), new THREE.MeshLambertMaterial({color:0x8a1a1a}));
+    hat.position.y = 1.66;
+  }
+  // backpack on the back
+  backpack = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.4,0.12), new THREE.MeshLambertMaterial({color: team==='CT' ? 0x2a4a6a : 0x5a4a2a}));
+  backpack.position.set(0,1.05,0.22);
+  [legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel,mag,hat,backpack].forEach(m=>m.castShadow = true);
+  g.add(legL,legR,bootL,bootR,torso,head,face,armL,armR,handL,handR,gun,barrel,mag,hat,backpack);
 
   const bot = {
     team, name, group:g, x:0, z:0, y:0, vy:0, onGround:true,
@@ -3086,6 +3102,22 @@ function updateBot(b, dt){
     }
   }
   let moveX = 0, moveZ = 0;
+  // FREEZE: bots hold position during freeze time (like the player)
+  if(roundState === 'freeze'){
+    // bots stand still, look around a bit
+    b.yaw += Math.sin(b.walkT||0)*0.05;
+    moveX = 0; moveZ = 0;
+    b.walkT = (b.walkT||0) + dt;
+    const bW2 = WEAPONS[b.weapon];
+    if(b.ammo && b.ammo.mag <= 0 && !b.reloading && bW2.kind !== 'knife'){
+      b.reloading = true;
+      b.reloadT = bW2.reload * 0.8;
+    }
+    b.group.position.set(b.x, b.y, b.z);
+    b.group.rotation.y = b.yaw;
+    b.shadow.position.set(b.x, 0.02, b.z);
+    return; // skip the rest of movement logic
+  }
   const blinded = b.flashT > 0;
   if(b.mode === 'combat' && b.target && !blinded){
     const tx = b.target.x, tz = b.target.z;
